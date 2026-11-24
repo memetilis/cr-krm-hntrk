@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Royal AI - Dikey Arena</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111827;color:#f8fafc;font-family:Arial,sans-serif}
+.app{width:min(100%,500px);margin:auto;padding:10px}
+h1{text-align:center;color:#facc15;margin:4px 0 8px;font-size:25px}
+.top{display:flex;justify-content:space-between;gap:5px;margin:7px 0}.pill{background:#263449;border:1px solid #526178;border-radius:9px;padding:7px 8px;font-size:13px;font-weight:bold}
+canvas{display:block;width:100%;height:auto;border:3px solid #64748b;border-radius:13px;background:#65a85e;touch-action:manipulation}
+.hand{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.card{background:#29384e;color:white;border:2px solid #64748b;border-radius:11px;min-height:72px;padding:7px 3px;font-weight:bold;font-size:13px;cursor:pointer}
+.card.selected{border-color:#facc15;background:#465673;transform:translateY(-2px)}.card:disabled{opacity:.4}
+.cost{color:#c4b5fd;font-size:12px}.hint{text-align:center;color:#cbd5e1;font-size:12px;line-height:1.35;margin:8px 0}
+.actions{display:flex;justify-content:center;gap:8px}.action{background:#eab308;color:#172033;border:0;border-radius:9px;padding:9px 13px;font-weight:bold}
+#msg{text-align:center;color:#fde68a;min-height:20px;font-size:13px;margin:7px 0}
+.overlay{position:fixed;inset:0;background:#0b1220ed;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+.panel{width:min(100%,360px);background:#263449;border:2px solid #64748b;border-radius:16px;padding:22px;text-align:center;box-shadow:0 15px 50px #0008}
+.panel h2{color:#facc15;margin:0 0 8px}.panel p{color:#cbd5e1;font-size:14px}
+input{width:100%;padding:12px;border-radius:9px;border:1px solid #94a3b8;background:#111827;color:white;font-size:16px;margin:8px 0}
+.start{width:100%;padding:12px;border:0;border-radius:9px;background:#eab308;color:#111827;font-size:16px;font-weight:bold;cursor:pointer}
+@media(max-height:760px){.app{padding:6px}h1{font-size:21px;margin:2px}.top{margin:4px 0}.hint{margin:5px 0}}
+</style></head>
+<body>
+<div class="app">
+<h1>👑 ROYAL AI</h1>
+<div class="top"><div class="pill">🔵 <span id="pname">Oyuncu</span>: <span id="php">1200</span></div><div class="pill">💧 <span id="mana">5.0</span>/10</div><div class="pill">🔴 YZ: <span id="ehp">1200</span></div></div>
+<canvas id="arena" width="420" height="700"></canvas>
+<div id="hand" class="hand"></div>
+<div class="hint">Kart seç, sonra arenanın kendi tarafındaki bölümüne dokun. Büyüler için rakibin tarafına dokunabilirsin. 3 kart elinde, toplam 5 kartlık desten var.</div>
+<div class="actions"><button class="action" id="again">↻ Yeniden başlat</button><button class="action" id="mode">YZ: Normal</button></div>
+<div id="msg">Savaş başlıyor!</div>
+</div>
+<div class="overlay" id="welcome"><div class="panel"><h2>⚔️ ROYAL AI</h2><p>Savaşa başlamadan önce oyuncu adını yaz.</p><input id="playerName" maxlength="16" placeholder="Oyuncu adın" autocomplete="off"><button class="start" id="begin">SAVAŞA BAŞLA</button></div></div>
+<script>
+(()=>{
+const cv=document.getElementById('arena'),g=cv.getContext('2d'),W=420,H=700,$=id=>document.getElementById(id);
+const specs={
+ knight:{name:'Şövalye',icon:'🛡️',cost:3,hp:190,dmg:31,range:25,speed:38,rate:.85,r:15,kind:'unit'},
+ archer:{name:'Okçu',icon:'🏹',cost:3,hp:105,dmg:22,range:105,speed:31,rate:1.05,r:12,kind:'unit'},
+ giant:{name:'Dev',icon:'🗿',cost:5,hp:500,dmg:67,range:27,speed:17,rate:1.5,r:20,kind:'unit'},
+ goblin:{name:'Goblin',icon:'👺',cost:2,hp:82,dmg:24,range:23,speed:59,rate:.62,r:11,kind:'unit'},
+ fireball:{name:'Ateş Topu',icon:'🔥',cost:4,kind:'spell'},
+ heal:{name:'İyileştirme',icon:'💚',cost:3,kind:'spell'}
+};
+const deck=['knight','archer','giant','fireball','heal'];
+let hand=[],next=3,selected='',units=[],shots=[],effects=[],mana=5,pHP=1200,eHP=1200,over=true,aiTimer=2.5,last=0,level=1,pName='Oyuncu',flashP=0,flashE=0;
+const pTower={x:210,y:625},eTower={x:210,y:78};
+function reset(){
+ units=[];shots=[];effects=[];mana=5;pHP=eHP=1200;over=false;aiTimer=2.5;flashP=flashE=0;
+ hand=deck.slice(0,3);next=3;selected=hand[0];$('msg').textContent='Lupta başladı! Kulelerini koru.';ui();
+}
+function ui(){
+ $('pname').textContent=pName;$('php').textContent=Math.max(0,Math.ceil(pHP));$('ehp').textContent=Math.max(0,Math.ceil(eHP));$('mana').textContent=mana.toFixed(1);
+ const h=$('hand');h.innerHTML='';
+ hand.forEach(k=>{const s=specs[k],b=document.createElement('button');b.className='card'+(selected===k?' selected':'');b.disabled=over||mana<s.cost;
+ b.innerHTML=`${s.icon} ${s.name}<br><span class="cost">${s.cost} iksir</span>`;b.onclick=()=>{selected=k;ui()};h.appendChild(b)});
+}
+function spawn(k,team,x,y){
+ const s=specs[k];units.push({k,team,x,y,hp:s.hp,max:s.hp,cd:0,phase:Math.random()*6});
+ for(let i=0;i<5;i++)effects.push({x,y,vx:(Math.random()-.5)*55,vy:(Math.random()-.5)*55,life:.3,color:team==='p'?'#bfdbfe':'#fecaca',r:3});
+}
+function cycle(k){hand.splice(hand.indexOf(k),1);hand.push(deck[next]);next=(next+1)%deck.length;selected=hand[0]}
+function cast(k,x,y,team){
+ if(k==='fireball'){
+  effects.push({x,y,life:.65,spell:'fire'});units.filter(u=>u.team!==team&&Math.hypot(u.x-x,u.y-y)<78).forEach(u=>u.hp-=145);
+  if(team==='p'&&Math.hypot(eTower.x-x,eTower.y-y)<82)eHP-=115;
+  if(team==='e'&&Math.hypot(pTower.x-x,pTower.y-y)<82)pHP-=115;
+ }else if(k==='heal'){
+  effects.push({x,y,life:.7,spell:'heal'});units.filter(u=>u.team===team&&Math.hypot(u.x-x,u.y-y)<85).forEach(u=>u.hp=Math.min(u.max,u.hp+105));
+ }
+}
+cv.addEventListener('pointerdown',e=>{
+ if(over)return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height,k=selected,s=specs[k];
+ if(s.kind==='spell'){
+  if(k==='fireball'&&((pName&&y>H/2)||true)){cast(k,x,y,'p')}
+  else if(k==='heal'){cast(k,x,y,'p')}
+  mana-=s.cost;cycle(k);ui();return;
+ }
+ if(y<H/2+10){$('msg').textContent='Birliklerini kendi tarafına, alt bölgeye yerleştir.';return}
+ if(mana<s.cost)return;mana-=s.cost;spawn(k,'p',Math.max(24,Math.min(W-24,x)),Math.max(390,Math.min(665,y)));cycle(k);ui();
+});
+function towerDamage(team,d){if(team==='p'){eHP-=d;flashE=.15}else{pHP-=d;flashP=.15}}
+function nearest(u){
+ const enemies=units.filter(v=>v.team!==u.team&&v.hp>0);let best=null,dist=1e9;
+ for(const v of enemies){let d=Math.hypot(v.x-u.x,v.y-u.y);if(d<dist){dist=d;best=v}}
+ if(best&&dist<specs[u.k].range+35)return {obj:best,dist};
+ const t=u.team==='p'?eTower:pTower;return {obj:t,dist:Math.hypot(t.x-u.x,t.y-u.y),tower:true};
+}
+function damage(t,d,team){if(t===pTower)towerDamage('e',d);else if(t===eTower)towerDamage('p',d);else t.hp-=d;effects.push({x:t.x,y:t.y,life:.25,spell:'hit'})}
+function aiPlay(){
+ // Rakip de aynı iksir kurallarına tabidir; kartı karşılayamıyorsa bekler.
+ const aiMana=aiPlay.mana;
+ const choices=['knight','archer','giant','fireball','heal'].filter(k=>specs[k].cost<=aiMana);
+ if(!choices.length)return;
+ const playerPush=units.filter(u=>u.team==='p'&&u.hp>0);
+ let k=choices[Math.floor(Math.random()*choices.length)];
+ if(playerPush.length&&Math.random()<.55&&choices.includes('fireball'))k='fireball';
+ if(specs[k].kind==='spell'){
+  const target=playerPush.sort((a,b)=>b.hp-a.hp)[0];
+  if(k==='fireball'&&target)cast(k,target.x,target.y,'e');
+  else if(k==='heal'){let ally=units.filter(u=>u.team==='e').sort((a,b)=>a.hp/a.max-b.hp/b.max)[0];if(ally)cast(k,ally.x,ally.y,'e')}
+ }else spawn(k,'e',Math.random()*300+60,Math.random()*180+185);
+ aiPlay.mana-=specs[k].cost;
+}
+aiPlay.mana=5;
+function update(dt){
+ if(over)return;mana=Math.min(10,mana+dt*.42);aiPlay.mana=Math.min(10,aiPlay.mana+dt*.42);aiTimer-=dt;
+ if(aiTimer<=0){aiPlay();aiTimer=(level===0?5.4:level===2?2.5:3.7)+Math.random()*1.2}
+ for(const u of units){let s=specs[u.k],t=nearest(u);u.phase+=dt*7;u.cd-=dt;
+  if(t.dist<=s.range+(t.tower?0:6)){if(u.cd<=0){damage(t.obj,s.dmg,u.team);u.cd=s.rate}}
+  else{let dx=t.obj.x-u.x,dy=t.obj.y-u.y,d=Math.max(1,Math.hypot(dx,dy));u.x+=dx/d*s.speed*dt;u.y+=dy/d*s.speed*dt;u.y=Math.max(100,Math.min(660,u.y))}
+ }
+ for(const e of effects){e.life-=dt;if(e.vx){e.x+=e.vx*dt;e.y+=e.vy*dt}}
+ effects=effects.filter(e=>e.life>0);units=units.filter(u=>u.hp>0);
+ flashP=Math.max(0,flashP-dt);flashE=Math.max(0,flashE-dt);
+ if(pHP<=0||eHP<=0){over=true;$('msg').textContent=eHP<=0?'🏆 '+pName+' kazandı!':'🤖 Yapay zekâ kazandı. Tekrar dene!'}
+ ui();
+}
+function drawTower(t,team,hp,flash){
+ g.save();g.translate(t.x,t.y);g.fillStyle=flash?'#fff':'#334155';g.fillRect(-28,-27,56,54);g.fillStyle=team==='p'?'#2563eb':'#dc2626';g.fillRect(-23,-22,46,44);g.fillStyle='#e2e8f0';g.fillRect(-9,-43,18,18);g.fillStyle='#facc15';g.beginPath();g.moveTo(-14,-43);g.lineTo(0,-57);g.lineTo(14,-43);g.fill();g.restore();
+ g.fillStyle='#0f172a';g.fillRect(t.x-34,t.y-65,68,7);g.fillStyle=team==='p'?'#60a5fa':'#f87171';g.fillRect(t.x-34,t.y-65,68*Math.max(0,hp/1200),7);
+}
+function drawUnit(u){
+ const p=u.team==='p',s=specs[u.k],bob=Math.sin(u.phase)*2;g.save();g.translate(u.x,u.y+bob);
+ g.fillStyle='#15203355';g.beginPath();g.ellipse(0,12,s.r+5,5,0,0,7);g.fill();
+ if(u.k==='knight'){g.fillStyle=p?'#2563eb':'#b91c1c';g.fillRect(-11,-2,22,17);g.fillStyle='#cbd5e1';g.beginPath();g.arc(0,-10,12,Math.PI,0);g.lineTo(12,-2);g.lineTo(-12,-2);g.fill();g.fillStyle='#111827';g.fillRect(-7,-9,14,4);g.fillStyle='#e2e8f0';g.fillRect(12,-4,4,18)}
+ if(u.k==='archer'){g.fillStyle=p?'#0e7490':'#9f1239';g.beginPath();g.moveTo(-13,8);g.lineTo(-9,-13);g.lineTo(0,-19);g.lineTo(10,-12);g.lineTo(13,8);g.fill();g.fillStyle='#f2c6a0';g.beginPath();g.arc(0,-7,7,0,7);g.fill();g.strokeStyle='#d6a45b';g.lineWidth=3;g.beginPath();g.arc(12,-1,11,-1.2,1.2);g.stroke()}
+ if(u.k==='giant'){g.fillStyle='#8b5e3c';g.beginPath();g.ellipse(0,0,19,24,0,0,7);g.fill();g.fillStyle='#e7b98d';g.beginPath();g.arc(0,-18,12,0,7);g.fill();g.fillStyle='#6b442c';g.fillRect(-13,-27,26,8)}
+ if(u.k==='goblin'){g.fillStyle=p?'#15803d':'#b91c1c';g.beginPath();g.moveTo(-8,-7);g.lineTo(-19,-19);g.lineTo(-14,1);g.lineTo(-10,9);g.lineTo(10,9);g.lineTo(14,1);g.lineTo(19,-19);g.lineTo(8,-7);g.fill();g.fillStyle='#86efac';g.beginPath();g.arc(0,-6,9,0,7);g.fill();g.fillStyle='#14532d';g.fillRect(-5,-8,3,3);g.fillRect(3,-8,3,3)}
+ g.restore();g.fillStyle='#0f172a';g.fillRect(u.x-17,u.y-s.r-13,34,4);g.fillStyle=p?'#93c5fd':'#fca5a5';g.fillRect(u.x-17,u.y-s.r-13,34*Math.max(0,u.hp/u.max),4);
+}
+function draw(){
+ g.clearRect(0,0,W,H);g.fillStyle='#65a85e';g.fillRect(0,0,W,H);
+ for(let y=120;y<690;y+=42){g.fillStyle='#ffffff12';g.fillRect(0,y,W,2)}
+ g.fillStyle='#3b82a6';g.fillRect(0,330,W,42);g.fillStyle='#bda47b';g.fillRect(176,315,68,72);g.fillStyle='#d6c09a';g.fillRect(184,321,52,60);
+ g.fillStyle='#ffffff20';g.fillRect(0,0,W,42);g.fillStyle='#fff';g.font='bold 14px Arial';g.textAlign='center';g.fillText('YAPAY ZEKÂ',210,28);
+ drawTower(eTower,'e',eHP,flashE);drawTower(pTower,'p',pHP,flashP);units.forEach(drawUnit);
+ effects.forEach(e=>{g.globalAlpha=Math.max(0,e.life/.7);if(e.spell==='fire'){g.fillStyle='#fb923c';g.beginPath();g.arc(e.x,e.y,78*(1-e.life/.7)+12,0,7);g.fill()}else if(e.spell==='heal'){g.strokeStyle='#4ade80';g.lineWidth=8;g.beginPath();g.arc(e.x,e.y,55*(1-e.life/.7)+10,0,7);g.stroke()}else{g.fillStyle=e.color||'#fde68a';g.fillRect(e.x,e.y,e.r||5,e.r||5)}g.globalAlpha=1});
+ if(over){g.fillStyle='#0f172acc';g.fillRect(0,0,W,H);g.fillStyle='#fff';g.font='bold 34px Arial';g.fillText(eHP<=0?'ZAFER!':'YENİLGİ',210,355)}
+}
+function loop(t){let dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop)}
+$('begin').onclick=()=>{pName=$('playerName').value.trim()||'Oyuncu';$('welcome').style.display='none';reset()};
+$('playerName').addEventListener('keydown',e=>{if(e.key==='Enter')$('begin').click()});
+$('again').onclick=()=>{over=true;$('welcome').style.display='flex';$('playerName').value=pName};
+$('mode').onclick=()=>{level=(level+1)%3;$('mode').textContent='YZ: '+['Kolay','Normal','Zor'][level]};
+ui();requestAnimationFrame(loop);
+})();
+</script></body></html>
