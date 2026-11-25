@@ -287,7 +287,7 @@ function getUnitTarget(u){
   const d=Math.hypot(v.x-u.x,v.y-u.y);
   if(d<closeD){close=v;closeD=d}
  }
- if(close&&closeD<=(u.k==='megaKnight'?170:u.k==='bandit'?150:specs[u.k].range+30))return {target:close,distance:closeD,isTower:false};
+ if(close&&closeD<=(u.k==='megaKnight'?170:specs[u.k].range+30))return {target:close,distance:closeD,isTower:false};
  const tower=nearestTower(u);
  if(tower)return {target:tower,distance:Math.hypot(tower.x-u.x,tower.y-u.y),isTower:true};
  if(close)return {target:close,distance:closeD,isTower:false};
