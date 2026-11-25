@@ -359,6 +359,7 @@ function updateUnits(dt){
       if(s.spirit==='ice')v.frozen=Math.max(v.frozen||0,1.7);
       if(s.spirit==='electric')v.frozen=Math.max(v.frozen||0,.75);
      });
+     if(info.isTower)applyDamage(info.target,(u.dmg||s.dmg)*.8);
      effects.push({x:u.x,y:u.y,life:.55,spell:s.spirit==='fire'?'fire':s.spirit==='ice'?'freeze':'lightning'});
      u.hp=0;
     }else if(s.ranged||s.flying||s.range>65){
