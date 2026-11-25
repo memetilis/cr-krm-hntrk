@@ -395,7 +395,7 @@ function updateUnits(dt){
    u.jump={sx:u.x,sy:u.y,tx:info.target.x-dx/d*30,ty:info.target.y-dy/d*30,t:0,duration:.42};continue;
   }
 
-  if(info.distance<=(specs[u.k].attackRange||specs[u.k].range)+(info.isTower?5:8)){
+  if(info.distance<=((u.k==='bowler'||u.k==='princess')?specs[u.k].attackRange:(specs[u.k].attackRange||specs[u.k].range)+(info.isTower?5:8))){
    if(u.cd<=0){
     const s=specs[u.k],dx=info.target.x-u.x,dy=info.target.y-u.y;
     u.attackDir=Math.atan2(dy,dx);u.attackAnim=.28;u.cd=attackCooldown(u.team,u.x,u.y,s.rate);playSound('attack');
@@ -475,7 +475,7 @@ function aiPlay(){
  const playerUnits=units.filter(u=>u.team==='p'&&u.hp>0);
  const aiUnits=units.filter(u=>u.team==='e'&&u.hp>0);
  const hurtAlly=aiUnits.filter(u=>u.hp/u.max<.72).sort((a,b)=>a.hp/a.max-b.hp/b.max)[0];
- const cluster=playerUnits.slice().sort((a,b)=>Math.hypot(a.x-210,a.y-350)-Math.hypot(b.x-210,b.y-350)).slice(0,4);
+ const cluster=playerUnits.slice().sort((a,b)=>Math.hypot(a.x-198,a.y-350)-Math.hypot(b.x-198,b.y-350)).slice(0,4);
  const center=cluster.length?{x:cluster.reduce((s,u)=>s+u.x,0)/cluster.length,y:cluster.reduce((s,u)=>s+u.y,0)/cluster.length}:{x:198,y:580};
  const threatened=playerUnits.filter(u=>u.y<360);
  const scores=choices.map(k=>{
@@ -672,7 +672,7 @@ function draw(){
  if(over){
   g.fillStyle='#0f172acc';g.fillRect(0,0,W,H);
   g.fillStyle='#fff';g.font='bold 32px Arial';g.textAlign='center';
-  g.fillText(matchResult==='win'?'ZAFER!':matchResult==='draw'?'BERABERE':'YENİLGİ',210,355);
+  g.fillText(matchResult==='win'?'ZAFER!':matchResult==='draw'?'BERABERE':'YENİLGİ',198,355);
  }
 }
 function loop(t){
