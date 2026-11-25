@@ -98,7 +98,7 @@ let playerDeck=[],playerHand=[],playerNext=4,selected='';
 let aiHand=[],aiNext=4,aiMana=5;
 let units=[],towers=[],arrows=[],effects=[];
 let mana=5,pName='Oyuncu',over=true,level=1,aiTimer=2.7,last=0;
-let matchTime=180,suddenDeath=false,poisonZones=[],themeIndex=0;
+let matchTime=180,suddenDeath=false,poisonZones=[],themeIndex=0,matchResult='';
 const arenaThemes=[{name:'Orman',grass:'#65a85e',water:'#3b82a6',bridge:'#8b6a45'},{name:'Çöl',grass:'#b99a58',water:'#3988a8',bridge:'#80552f'},{name:'Buz',grass:'#8db9c9',water:'#3976a8',bridge:'#b5cbd5'}];
 let trophies=0,coins=100,wins=0,losses=0,cardLevels={},upgradeTarget='';
 try{const saved=JSON.parse(localStorage.getItem('royalAIProfile')||'{}');trophies=Number(saved.trophies)||0;coins=Number.isFinite(Number(saved.coins))?Number(saved.coins):100;wins=Number(saved.wins)||0;losses=Number(saved.losses)||0;cardLevels=saved.cardLevels&&typeof saved.cardLevels==='object'?saved.cardLevels:{}}catch(e){}
@@ -257,7 +257,7 @@ function getUnitTarget(u){
   const d=Math.hypot(v.x-u.x,v.y-u.y);
   if(d<closeD){close=v;closeD=d}
  }
- if(close&&closeD<=specs[u.k].range+30)return {target:close,distance:closeD,isTower:false};
+ if(close&&closeD<=(u.k==='megaKnight'?170:specs[u.k].range+30))return {target:close,distance:closeD,isTower:false};
  const tower=nearestTower(u);
  if(tower)return {target:tower,distance:Math.hypot(tower.x-u.x,tower.y-u.y),isTower:true};
  if(close)return {target:close,distance:closeD,isTower:false};
@@ -380,13 +380,13 @@ function startMatch(){
  playerNext=4;selected=playerHand[0];
  aiHand=aiDeck.slice(0,4);aiNext=4;aiMana=5;
  units=[];arrows=[];effects=[];poisonZones=[];mana=5;aiMana=5;matchTime=180;suddenDeath=false;
- makeTowers();over=false;aiTimer=2.7;last=0;
+ makeTowers();over=false;matchResult='';aiTimer=2.7;last=0;
  $('welcome').style.display='none';
  $('msg').textContent='Savaş başladı! Üç kuleyi koru.';
  renderHand();updateHud();
 }
 function finishMatch(result,reason){
- if(over)return;over=true;
+ if(over)return;over=true;matchResult=result;
  if(result==='win'){trophies+=30;coins+=100;wins++;$('msg').textContent='🏆 '+pName+' kazandı! +30 kupa, +100 altın. '+reason;}
  else if(result==='loss'){trophies=Math.max(0,trophies-12);coins+=25;losses++;$('msg').textContent='🤖 Yapay zekâ kazandı. -12 kupa, +25 altın. '+reason;}
  else{trophies+=5;coins+=40;$('msg').textContent='🤝 Berabere! +5 kupa, +40 altın. '+reason;}
@@ -501,7 +501,7 @@ function draw(){
  if(over){
   g.fillStyle='#0f172acc';g.fillRect(0,0,W,H);
   g.fillStyle='#fff';g.font='bold 32px Arial';g.textAlign='center';
-  g.fillText(livingTowers('e').length===0?'ZAFER!':'YENİLGİ',210,355);
+  g.fillText(matchResult==='win'?'ZAFER!':matchResult==='draw'?'BERABERE':'YENİLGİ',210,355);
  }
 }
 function loop(t){
