@@ -25,7 +25,7 @@ input{width:100%;padding:12px;border-radius:9px;border:1px solid #94a3b8;backgro
 <body>
 <div class="app">
 <h1>👑 ROYAL AI</h1>
-<div class="top"><div class="pill">🔵 <span id="pname">Oyuncu</span>: <span id="php">1200</span></div><div class="pill">💧 <span id="mana">5.0</span>/10</div><div class="pill">🔴 YZ: <span id="ehp">1200</span></div></div>
+<div class="top"><div class="pill">🔵 <span id="pname">Oyuncu</span>: <span id="php">1200</span></div><div class="pill">💧 <span id="mana">5.0</span>/10</div><div class="pill">🔴 YZ: <span id="ehp">1200</span><br>💧 <span id="aimana">5.0</span>/10</div></div>
 <canvas id="arena" width="420" height="700"></canvas>
 <div id="hand" class="hand"></div>
 <div class="hint">Kart seç, sonra arenanın kendi tarafına yerleştir. Büyüleri arenada istediğin yere kullanabilirsin. Elinde 3 kart var; kartlar 11 kartlık desteden sırayla döner.</div>
@@ -51,10 +51,10 @@ const specs={
  heal:{name:'İyileştirme',icon:'💚',cost:3,kind:'spell'}
 };
 const deck=['knight','archer','giant','fireball','heal','miniPekka','hogRider','musketeer','megaKnight','witch','skeleton'];
-let hand=[],next=3,selected='',units=[],shots=[],effects=[],mana=5,pHP=1200,eHP=1200,over=true,aiTimer=2.5,last=0,level=1,pName='Oyuncu',flashP=0,flashE=0;
+let hand=[],next=3,aiHand=[],aiNext=3,selected='',units=[],shots=[],effects=[],mana=5,pHP=1200,eHP=1200,over=true,aiTimer=2.5,last=0,level=1,pName='Oyuncu',flashP=0,flashE=0;
 const pTower={x:210,y:625},eTower={x:210,y:78};
 function reset(){
- units=[];shots=[];effects=[];mana=5;pHP=eHP=1200;over=false;aiTimer=2.5;flashP=flashE=0;
+ units=[];shots=[];effects=[];mana=5;aiPlay.mana=5;aiHand=deck.slice(0,3);aiNext=3;pHP=eHP=1200;over=false;aiTimer=2.5;flashP=flashE=0;
  hand=deck.slice(0,3);next=3;selected=hand[0];$('msg').textContent='Lupta başladı! Kulelerini koru.';ui();
 }
 function ui(){
@@ -102,17 +102,20 @@ function damage(t,d,team){if(t===pTower)towerDamage('e',d);else if(t===eTower)to
 function aiPlay(){
  // Rakip de aynı iksir kurallarına tabidir; kartı karşılayamıyorsa bekler.
  const aiMana=aiPlay.mana;
- const choices=deck.filter(k=>specs[k].cost<=aiMana);
+ const choices=aiHand.filter(k=>specs[k].cost<=aiMana);
  if(!choices.length)return;
  const playerPush=units.filter(u=>u.team==='p'&&u.hp>0);
  let k=choices[Math.floor(Math.random()*choices.length)];
  if(playerPush.length&&Math.random()<.55&&choices.includes('fireball'))k='fireball';
+ const usedIndex=aiHand.indexOf(k);
+ if(usedIndex<0||aiPlay.mana<specs[k].cost)return;
  if(specs[k].kind==='spell'){
   const target=playerPush.sort((a,b)=>b.hp-a.hp)[0];
   if(k==='fireball'&&target)cast(k,target.x,target.y,'e');
   else if(k==='heal'){let ally=units.filter(u=>u.team==='e').sort((a,b)=>a.hp/a.max-b.hp/b.max)[0];if(ally)cast(k,ally.x,ally.y,'e')}
  }else spawn(k,'e',Math.random()*300+60,Math.random()*180+185);
- aiPlay.mana-=specs[k].cost;
+ aiPlay.mana=Math.max(0,aiPlay.mana-specs[k].cost);
+ aiHand.splice(usedIndex,1);aiHand.push(deck[aiNext]);aiNext=(aiNext+1)%deck.length;
 }
 aiPlay.mana=5;
 function update(dt){
@@ -138,6 +141,7 @@ function update(dt){
  $('php').textContent=Math.max(0,Math.ceil(pHP));
  $('ehp').textContent=Math.max(0,Math.ceil(eHP));
  $('mana').textContent=mana.toFixed(1);
+ $('aimana').textContent=aiPlay.mana.toFixed(1);
  [...$('hand').children].forEach((b,i)=>{b.disabled=over||mana<specs[hand[i]].cost});
 }
 function drawTower(t,team,hp,flash){
