@@ -194,7 +194,7 @@ function renderPicker(){
   const s=specs[k],b=document.createElement('button');
   b.type='button';
   b.className='pick-card'+(pickedDeck.includes(k)?' chosen':'');
-  const cost=cardCost(k,'p');b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+(Number.isFinite(cost)?cost+' iksir':'Önce kart oyna')+'</span>';
+  const cost=cardCost(k,'p');b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+(Number.isFinite(cost)?cost+' iksir':'Önce kart oyna')+'</span>'+(k==='log'?'<br><span class="cost">11 kare menzil</span>':'');
   b.disabled=!pickedDeck.includes(k)&&pickedDeck.length>=8;
   b.onclick=()=>{
    upgradeTarget=k;
@@ -230,7 +230,7 @@ function renderHand(){
   const s=specs[k],b=document.createElement('button');
   b.type='button';
   b.className='card'+(selected===k?' selected':'');
-  b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+s.cost+' iksir</span>';
+  const cost=cardCost(k,'p');b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+(Number.isFinite(cost)?cost+' iksir':'Önce kart oyna')+'</span>'+(k==='log'?'<br><span class="cost">11 kare menzil</span>':'');
   b.onclick=()=>{selected=k;renderHand()};
   host.appendChild(b);
  });
