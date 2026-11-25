@@ -31,6 +31,18 @@ input{width:100%;padding:10px;border-radius:9px;border:1px solid #94a3b8;backgro
 .pick-card{min-height:62px}
 .pick-card.chosen{border-color:#facc15;background:#465673;box-shadow:inset 0 0 0 1px #facc15}
 .pick-card:disabled{opacity:.45}
+.pick-card.at-limit{opacity:.55}
+.card.unplayable{opacity:.42}
+.card-info-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:14px;background:#020617dd;z-index:20}
+.card-info-panel{width:min(100%,390px);max-height:88vh;overflow-y:auto;background:#263449;border:2px solid #a78bfa;border-radius:16px;padding:17px;box-shadow:0 16px 48px #000b;text-align:center}
+.card-info-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.card-info-head h2{color:#facc15;font-size:21px;margin:0;text-align:left}
+.card-info-close{border:0;border-radius:8px;background:#475569;color:white;font-size:20px;font-weight:bold;padding:5px 11px;cursor:pointer}
+.card-info-type{color:#c4b5fd;font-size:12px;font-weight:bold;margin:0 0 10px}
+.card-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;text-align:left}
+.card-info-stat{background:#172337;border:1px solid #475569;border-radius:9px;padding:9px;font-size:12px;color:#cbd5e1}
+.card-info-stat strong{display:block;color:#fff;font-size:15px;margin-top:3px}
+.card-info-note{background:#172337;border-radius:10px;padding:11px;margin:10px 0 0;color:#e2e8f0;font-size:13px;line-height:1.45;text-align:left}
 .start{width:100%;padding:12px;border:0;border-radius:9px;background:#eab308;color:#111827;font-size:16px;font-weight:bold;cursor:pointer}
 .start:disabled{opacity:.4;cursor:not-allowed}
 .record{text-align:center;color:#fde68a;font-size:11px;font-weight:bold;margin:4px 0 7px}
@@ -52,10 +64,11 @@ input{width:100%;padding:10px;border-radius:9px;border:1px solid #94a3b8;backgro
 <canvas id="arena" width="396" height="704"></canvas>
 <div class="battle-bottom"><div class="mana-box">🔵 Sen: <strong id="mana">5.0</strong>/10</div><div class="mana-box">🔴 YZ: <strong id="aimana">5.0</strong>/10</div></div>
 <div id="hand" class="hand"></div><div class="next-card" id="nextPreview">Sonraki kart: —</div>
-<div class="hint">8 kartlık destenle oyna. Elinde 4 kart bulunur. Kuleleri yıkınca her biri 1 taç kazandırır. İki köprüden geç; kulelerin ok atar.</div>
+<div class="hint">8 kartlık destenle oyna. Elinde 4 kart bulunur. Kuleleri yıkınca her biri 1 taç kazandırır. Kart bilgisi: bilgisayarda sağ tık, telefonda/tablette basılı tut.</div>
 <div class="actions"><button class="action" id="again">↻ Deste / yeniden başlat</button><button class="action" id="mode">YZ: Normal</button><button class="action" id="theme">🏟️ Orman</button><button class="action" id="soundToggle">🔊 Ses açık</button></div>
 <div id="msg">Deste seçip savaşa başla!</div>
 </div>
+<div class="card-info-overlay" id="cardInfoOverlay" role="dialog" aria-modal="true" aria-labelledby="cardInfoTitle"><div class="card-info-panel"><div class="card-info-head"><h2 id="cardInfoTitle">Kart bilgisi</h2><button class="card-info-close" id="closeCardInfo" aria-label="Kapat">✕</button></div><div id="cardInfoType" class="card-info-type"></div><div id="cardInfoGrid" class="card-info-grid"></div><div id="cardInfoNote" class="card-info-note"></div></div></div>
 <div class="overlay" id="welcome">
  <div class="panel">
   <div id="modeChoice">
@@ -131,6 +144,67 @@ const specs={
 
 };
 const allCards=Object.keys(specs).filter(k=>!['armySkeleton','elixirGolemite','elixirBlob','golemite'].includes(k));
+const cardInfoNotes={
+ fireball:'Hedef bölgesindeki birliklere 145, kulelere 82 hasar verir.',
+ heal:'Yakındaki dost birliklere 105 can kazandırır.',
+ lightning:'En yakın 3 düşman birliğine 220, yakındaki bir kuleye 145 hasar verir.',
+ poison:'Hedef bölgede 5 saniyelik zehir alanı oluşturur.',
+ freeze:'Yakındaki düşman birlik ve kuleleri 2,6 saniye dondurur.',
+ arrows:'Hedef bölgedeki birliklere 95, kulelere 48 hasar verir.',
+ graveyard:'5,2 saniye boyunca toplam 9 iskelet çıkarır.',
+ zap:'Yakındaki düşman birliklere 88, kulelere 45 hasar verir ve birlikleri kısa süre durdurur.',
+ log:'Düz ilerleyerek yolundaki düşmanlara çarpar. Menzili 11 kare.',
+ rocket:'Hedeflenen noktaya roket gönderir ve patlayarak alan hasarı verir.',
+ mirror:'En son oynadığın kartı 1 fazla iksirle kopyalar.',
+ fisherman:'Kancasını atıp düşman birliğini kendine çeker.',
+ royalGiant:'Sadece binaları ve kuleleri hedef alır.',
+ elixirPump:'Her 7 saniyede 1 iksir üretir. Binalar zamanla aşınır.',
+ elixirGolem:'Yenilince 2 İksir Golemit\'e ayrılır. Golemitler de 2\'şer İksir Küresi\'ne bölünür; bir küre yok edilince rakip 1 iksir kazanır.',
+ golem:'Yenilince 2 Golemit\'e ayrılır.',
+ furnace:'Her 4,6 saniyede bir Ateş Ruhu çıkarır.',
+ witch:'Her 6 saniyede bir iskelet çağırır.',
+ bananaTower:'Alanındaki dost birliklerin saldırısını hızlandırır, düşmanlarınkini yavaşlatır.',
+ megaKnight:'Uygun mesafedeki düşman birliklerin üzerine sıçrayarak alan hasarı verir.',
+ bowler:'Yuvarlanan kayası yolundaki düşmanlara çarpar.',
+ skeletonArmy:'15 iskeletten oluşan bir sürüdür.'
+};
+function formatCardInfoNumber(value){return Number.isInteger(value)?String(value):String(Number(value.toFixed(1))).replace('.',',');}
+function showCardInfo(k){
+ const s=specs[k];if(!s)return;
+ const level=cardLevels[k]||1,boost=s.kind==='unit'?1+(level-1)*.08:1;
+ const cost=cardCost(k,'p');
+ const rows=[['İksir',Number.isFinite(cost)?formatCardInfoNumber(cost):'Önce kart oyna'],['Seviye',String(level)]];
+ if(s.hp)rows.push(['Can',formatCardInfoNumber(s.hp*boost)]);
+ if(s.dmg)rows.push(['Hasar',formatCardInfoNumber(s.dmg*boost)]);
+ const range=s.attackRange||s.range;
+ if(range>0)rows.push(['Menzil',Math.max(1,Math.round(range/CELL))+' kare']);
+ if(s.rate>0&&(s.dmg>0||s.pump||k==='furnace'))rows.push([s.pump?'İksir üretim aralığı':k==='furnace'?'Ruh çıkarma aralığı':'Saldırı aralığı',formatCardInfoNumber(s.rate)+' sn']);
+ $('cardInfoTitle').textContent=s.icon+' '+s.name;
+ $('cardInfoType').textContent=s.kind==='spell'?'BÜYÜ':s.building?'BİNA':'BİRLİK';
+ $('cardInfoGrid').innerHTML=rows.map(([label,value])=>'<div class="card-info-stat">'+label+'<strong>'+value+'</strong></div>').join('');
+ $('cardInfoNote').textContent=cardInfoNotes[k]|| (s.kind==='spell'?'Hedeflenen alanda büyü etkisi oluşturur.':s.building?'Arenaya yerleştirilen bir yapıdır.':'Arenaya bırakılan bir birliktir.');
+ $('cardInfoOverlay').style.display='flex';
+}
+function closeCardInfo(){$('cardInfoOverlay').style.display='none';}
+function attachCardInfo(button,k){
+ button.addEventListener('contextmenu',e=>{e.preventDefault();showCardInfo(k);});
+ let pressTimer=null,startX=0,startY=0,longPressed=false;
+ const cancelPress=()=>{if(pressTimer!==null){clearTimeout(pressTimer);pressTimer=null;}};
+ button.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse')return;
+  cancelPress();longPressed=false;startX=e.clientX;startY=e.clientY;
+  pressTimer=setTimeout(()=>{pressTimer=null;longPressed=true;showCardInfo(k);},560);
+ });
+ button.addEventListener('pointermove',e=>{
+  if(pressTimer!==null&&Math.hypot(e.clientX-startX,e.clientY-startY)>12)cancelPress();
+ });
+ button.addEventListener('pointerup',cancelPress);
+ button.addEventListener('pointercancel',cancelPress);
+ button.addEventListener('pointerleave',cancelPress);
+ button.addEventListener('click',e=>{
+  if(longPressed){e.preventDefault();e.stopImmediatePropagation();longPressed=false;}
+ },true);
+}
 const aiDeck=['golem','elixirGolem','royalGiant','fisherman','elixirPump','mortar','skeletonArmy','rocket'];
 const laneXs=[66,198,330];
 const bridgeXs=[110,286]; // Sol köprü 2 kare sola alındı
@@ -194,7 +268,8 @@ function renderPicker(){
   b.type='button';
   b.className='pick-card'+(pickedDeck.includes(k)?' chosen':'');
   const cost=cardCost(k,'p');b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+(Number.isFinite(cost)?cost+' iksir':'Önce kart oyna')+'</span>'+(k==='log'?'<br><span class="cost">11 kare menzil</span>':'');
-  b.disabled=!pickedDeck.includes(k)&&pickedDeck.length>=8;
+  b.classList.toggle('at-limit',!pickedDeck.includes(k)&&pickedDeck.length>=8);
+  attachCardInfo(b,k);
   b.onclick=()=>{
    upgradeTarget=k;
    const idx=pickedDeck.indexOf(k);
@@ -218,7 +293,8 @@ function updateHud(){
  $('acrowns').textContent=String(crownsFor('e'));
  const buttons=$('hand').children;
  [...buttons].forEach((b,i)=>{
-  b.disabled=over||!Number.isFinite(cardCost(playerHand[i],'p'))||mana<cardCost(playerHand[i],'p');
+  const unavailable=over||!Number.isFinite(cardCost(playerHand[i],'p'))||mana<cardCost(playerHand[i],'p');
+  b.disabled=false;b.classList.toggle('unplayable',unavailable);b.setAttribute('aria-disabled',String(unavailable));
  });
 }
 function renderHand(){
@@ -230,7 +306,8 @@ function renderHand(){
   b.type='button';
   b.className='card'+(selected===k?' selected':'');
   const cost=cardCost(k,'p');b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+(Number.isFinite(cost)?cost+' iksir':'Önce kart oyna')+'</span>'+(k==='log'?'<br><span class="cost">11 kare menzil</span>':'');
-  b.onclick=()=>{selected=k;renderHand()};
+  attachCardInfo(b,k);
+  b.onclick=()=>{if(over||!Number.isFinite(cardCost(k,'p'))||mana<cardCost(k,'p'))return;selected=k;renderHand()};
   host.appendChild(b);
  });
  updateHud();
@@ -815,6 +892,9 @@ $('chooseAI').onclick=()=>{gameMode='ai';$('modeChoice').style.display='none';$(
 $('chooseOnline').onclick=()=>{$('onlineNote').textContent='Online modu henüz hazır değil: gerçek oyuncularla eşleşmek için çevrim içi sunucu kurulmalı. Şimdilik YZ\'ye Karşı modunu seçebilirsin.';};
 $('backToModes').onclick=()=>{$('deckSetup').style.display='none';$('modeChoice').style.display='block';};
 $('begin').onclick=startMatch;
+$('closeCardInfo').onclick=closeCardInfo;
+$('cardInfoOverlay').addEventListener('click',e=>{if(e.target===$('cardInfoOverlay'))closeCardInfo();});
+window.addEventListener('keydown',e=>{if(e.key==='Escape')closeCardInfo();});
 $('soundToggle').onclick=()=>{soundsEnabled=!soundsEnabled;$('soundToggle').textContent=soundsEnabled?'🔊 Ses açık':'🔇 Ses kapalı';if(soundsEnabled)playSound('drop');};
 $('upgradeCard').onclick=()=>{if(!upgradeTarget)return;const lv=cardLevels[upgradeTarget]||1,cost=50*lv;if(lv>=5||coins<cost)return;coins-=cost;cardLevels[upgradeTarget]=lv+1;saveProfile();renderPicker();updateUpgradeUI();profileText();$('msg').textContent=specs[upgradeTarget].name+' seviye '+(lv+1)+' oldu!';};
 $('theme').onclick=()=>{themeIndex=(themeIndex+1)%arenaThemes.length;$('theme').textContent='🏟️ '+arenaThemes[themeIndex].name;};
