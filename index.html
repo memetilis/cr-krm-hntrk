@@ -116,7 +116,11 @@ function update(dt){
  effects=effects.filter(e=>e.life>0);units=units.filter(u=>u.hp>0);
  flashP=Math.max(0,flashP-dt);flashE=Math.max(0,flashE-dt);
  if(pHP<=0||eHP<=0){over=true;$('msg').textContent=eHP<=0?'🏆 '+pName+' kazandı!':'🤖 Yapay zekâ kazandı. Tekrar dene!'}
- ui();
+ $('pname').textContent=pName;
+ $('php').textContent=Math.max(0,Math.ceil(pHP));
+ $('ehp').textContent=Math.max(0,Math.ceil(eHP));
+ $('mana').textContent=mana.toFixed(1);
+ [...$('hand').children].forEach((b,i)=>{b.disabled=over||mana<specs[hand[i]].cost});
 }
 function drawTower(t,team,hp,flash){
  g.save();g.translate(t.x,t.y);g.fillStyle=flash?'#fff':'#334155';g.fillRect(-28,-27,56,54);g.fillStyle=team==='p'?'#2563eb':'#dc2626';g.fillRect(-23,-22,46,44);g.fillStyle='#e2e8f0';g.fillRect(-9,-43,18,18);g.fillStyle='#facc15';g.beginPath();g.moveTo(-14,-43);g.lineTo(0,-57);g.lineTo(14,-43);g.fill();g.restore();
