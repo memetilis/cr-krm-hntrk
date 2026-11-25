@@ -107,7 +107,7 @@ const specs={
  electroSpirit:{name:'Elektrik Ruhu',icon:'⚡',cost:1,hp:68,dmg:35,range:62,speed:74,rate:.7,r:9,kind:'unit',spirit:'electric',deploy:.18},
  pekka:{name:'P.E.K.K.A',icon:'🦾',cost:7,hp:880,dmg:178,range:29,speed:17,rate:1.8,r:24,kind:'unit',deploy:1.05},
  babyDragon:{name:'Yavru Ejder',icon:'🐉',cost:4,hp:390,dmg:46,range:112,speed:32,rate:1.15,r:17,kind:'unit',flying:true,deploy:.65},
- princess:{name:'Prenses',icon:'👸',cost:3,hp:175,dmg:42,range:374,attackRange:374,speed:25,rate:1.25,r:12,kind:'unit',ranged:true,deploy:.55},
+ princess:{name:'Prenses',icon:'👸',cost:3,hp:175,dmg:42,range:264,attackRange:264,speed:25,rate:1.25,r:12,kind:'unit',ranged:true,deploy:.55},
  magicArcher:{name:'Büyülü Okçu',icon:'🪄',cost:4,hp:225,dmg:49,range:112,attackRange:224,speed:27,rate:1.25,r:13,kind:'unit',ranged:true,deploy:.6},
  bowler:{name:'Atıcı',icon:'🪨',cost:5,hp:590,dmg:76,range:110,attackRange:110,speed:23,rate:2.3,r:20,kind:'unit',ranged:true,rollRange:154,deploy:.7},
  furnace:{name:'Fırın',icon:'🔥',cost:4,hp:590,dmg:0,range:0,speed:0,rate:4.6,r:21,kind:'unit',building:true,deploy:.9},
@@ -119,7 +119,7 @@ const specs={
 const allCards=Object.keys(specs);
 const aiDeck=['pekka','babyDragon','bowler','furnace','fireSpirit','iceSpirit','electroSpirit','fireball'];
 const laneXs=[66,198,330];
-const bridgeXs=[154,286];
+const bridgeXs=[110,286]; // Sol köprü 2 kare sola alındı
 let pickedDeck=[];
 let playerDeck=[],playerHand=[],playerQueue=[],selected='';
 let aiHand=[],aiQueue=[],aiMana=5;
@@ -294,11 +294,18 @@ function placePlayerCard(x,y){
  if(over||!selected)return;
  const s=specs[selected];
  if(mana<s.cost){$('msg').textContent='Bu kart için yeterli iksirin yok.';return}
- if(s.kind==='unit'&&y<405){$('msg').textContent='Birliklerini kendi tarafına yerleştir.';return}
- mana-=s.cost;
  x=Math.floor(x/CELL)*CELL+CELL/2;y=Math.floor(y/CELL)*CELL+CELL/2;
+ const enemyLane=x<198?0:2;
+ const enemyGateOpen=towers.some(t=>t.team==='e'&&t.kind==='side'&&t.lane===enemyLane&&t.hp<=0);
+ const inEnemyTerritory=y<310;
+ const allowedEnemyLane=Math.abs(x-laneXs[enemyLane])<=88;
+ if(s.kind==='unit'&&inEnemyTerritory&&!(enemyGateOpen&&allowedEnemyLane)){
+  $('msg').textContent='Rakibin bu tarafındaki kuleyi yıkınca oraya kart bırakabilirsin.';return;
+ }
+ if(s.kind==='unit'&&y>=310&&y<405){$('msg').textContent='Köprüye kart bırakamazsın.';return}
+ mana-=s.cost;
  if(s.kind==='spell')cast(selected,x,y,'p');
- else {if(selected==='miniPekka')playMiniPekka();spawn(selected,'p',x,Math.max(415,Math.min(670,y)));}
+ else {if(selected==='miniPekka')playMiniPekka();spawn(selected,'p',x,inEnemyTerritory?Math.max(30,Math.min(305,y)):Math.max(415,Math.min(670,y)));}
  const used=selected;
  playSound('drop');
  cyclePlayer(used);
