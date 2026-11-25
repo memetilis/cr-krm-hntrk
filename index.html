@@ -28,7 +28,7 @@ input{width:100%;padding:12px;border-radius:9px;border:1px solid #94a3b8;backgro
 <div class="top"><div class="pill">🔵 <span id="pname">Oyuncu</span>: <span id="php">1200</span></div><div class="pill">💧 <span id="mana">5.0</span>/10</div><div class="pill">🔴 YZ: <span id="ehp">1200</span></div></div>
 <canvas id="arena" width="420" height="700"></canvas>
 <div id="hand" class="hand"></div>
-<div class="hint">Kart seç, sonra arenanın kendi tarafındaki bölümüne dokun. Büyüler için rakibin tarafına dokunabilirsin. 3 kart elinde, toplam 5 kartlık desten var.</div>
+<div class="hint">Kart seç, sonra arenanın kendi tarafına yerleştir. Büyüleri arenada istediğin yere kullanabilirsin. Elinde 3 kart var; kartlar 11 kartlık desteden sırayla döner.</div>
 <div class="actions"><button class="action" id="again">↻ Yeniden başlat</button><button class="action" id="mode">YZ: Normal</button></div>
 <div id="msg">Savaş başlıyor!</div>
 </div>
@@ -41,10 +41,16 @@ const specs={
  archer:{name:'Okçu',icon:'🏹',cost:3,hp:105,dmg:22,range:105,speed:31,rate:1.05,r:12,kind:'unit'},
  giant:{name:'Dev',icon:'🗿',cost:5,hp:500,dmg:67,range:27,speed:17,rate:1.5,r:20,kind:'unit'},
  goblin:{name:'Goblin',icon:'👺',cost:2,hp:82,dmg:24,range:23,speed:59,rate:.62,r:11,kind:'unit'},
+ miniPekka:{name:'Mini P.E.K.K.A',icon:'🤖',cost:4,hp:360,dmg:105,range:24,speed:34,rate:1.25,r:15,kind:'unit'},
+ hogRider:{name:'Binici',icon:'🐗',cost:4,hp:300,dmg:57,range:25,speed:76,rate:1.15,r:15,kind:'unit'},
+ musketeer:{name:'Silahşör',icon:'🎯',cost:4,hp:180,dmg:38,range:128,speed:27,rate:1.1,r:13,kind:'unit'},
+ megaKnight:{name:'Mega Şövalye',icon:'🛡️',cost:7,hp:760,dmg:78,range:30,speed:23,rate:1.35,r:23,kind:'unit'},
+ witch:{name:'Cadı',icon:'🧙',cost:5,hp:260,dmg:32,range:112,speed:25,rate:1.2,r:14,kind:'unit'},
+ skeleton:{name:'İskelet',icon:'💀',cost:1,hp:55,dmg:18,range:20,speed:66,rate:.7,r:8,kind:'unit'},
  fireball:{name:'Ateş Topu',icon:'🔥',cost:4,kind:'spell'},
  heal:{name:'İyileştirme',icon:'💚',cost:3,kind:'spell'}
 };
-const deck=['knight','archer','giant','fireball','heal'];
+const deck=['knight','archer','giant','fireball','heal','miniPekka','hogRider','musketeer','megaKnight','witch','skeleton'];
 let hand=[],next=3,selected='',units=[],shots=[],effects=[],mana=5,pHP=1200,eHP=1200,over=true,aiTimer=2.5,last=0,level=1,pName='Oyuncu',flashP=0,flashE=0;
 const pTower={x:210,y:625},eTower={x:210,y:78};
 function reset(){
@@ -58,7 +64,11 @@ function ui(){
  b.innerHTML=`${s.icon} ${s.name}<br><span class="cost">${s.cost} iksir</span>`;b.onclick=()=>{selected=k;ui()};h.appendChild(b)});
 }
 function spawn(k,team,x,y){
- const s=specs[k];units.push({k,team,x,y,hp:s.hp,max:s.hp,cd:0,phase:Math.random()*6});
+ const s=specs[k],count=k==='skeleton'?3:1;
+ for(let i=0;i<count;i++){
+  const offset=(i-(count-1)/2)*17;
+  units.push({k,team,x:Math.max(14,Math.min(W-14,x+offset)),y,hp:s.hp,max:s.hp,cd:0,phase:Math.random()*6,summonCd:5.5});
+ }
  for(let i=0;i<5;i++)effects.push({x,y,vx:(Math.random()-.5)*55,vy:(Math.random()-.5)*55,life:.3,color:team==='p'?'#bfdbfe':'#fecaca',r:3});
 }
 function cycle(k){hand.splice(hand.indexOf(k),1);hand.push(deck[next]);next=(next+1)%deck.length;selected=hand[0]}
@@ -92,7 +102,7 @@ function damage(t,d,team){if(t===pTower)towerDamage('e',d);else if(t===eTower)to
 function aiPlay(){
  // Rakip de aynı iksir kurallarına tabidir; kartı karşılayamıyorsa bekler.
  const aiMana=aiPlay.mana;
- const choices=['knight','archer','giant','fireball','heal'].filter(k=>specs[k].cost<=aiMana);
+ const choices=deck.filter(k=>specs[k].cost<=aiMana);
  if(!choices.length)return;
  const playerPush=units.filter(u=>u.team==='p'&&u.hp>0);
  let k=choices[Math.floor(Math.random()*choices.length)];
@@ -108,7 +118,15 @@ aiPlay.mana=5;
 function update(dt){
  if(over)return;mana=Math.min(10,mana+dt*.42);aiPlay.mana=Math.min(10,aiPlay.mana+dt*.42);aiTimer-=dt;
  if(aiTimer<=0){aiPlay();aiTimer=(level===0?5.4:level===2?2.5:3.7)+Math.random()*1.2}
- for(const u of units){let s=specs[u.k],t=nearest(u);u.phase+=dt*7;u.cd-=dt;
+ for(const u of [...units]){
+  if(u.k==='witch'){
+   u.summonCd-=dt;
+   if(u.summonCd<=0){
+    spawn('skeleton',u.team,u.x+(Math.random()-.5)*28,u.team==='p'?Math.min(660,u.y+22):Math.max(100,u.y-22));
+    u.summonCd=5.5;
+   }
+  }
+  let s=specs[u.k],t=nearest(u);u.phase+=dt*7;u.cd-=dt;
   if(t.dist<=s.range+(t.tower?0:6)){if(u.cd<=0){damage(t.obj,s.dmg,u.team);u.cd=s.rate}}
   else{let dx=t.obj.x-u.x,dy=t.obj.y-u.y,d=Math.max(1,Math.hypot(dx,dy));u.x+=dx/d*s.speed*dt;u.y+=dy/d*s.speed*dt;u.y=Math.max(100,Math.min(660,u.y))}
  }
@@ -133,6 +151,12 @@ function drawUnit(u){
  if(u.k==='archer'){g.fillStyle=p?'#0e7490':'#9f1239';g.beginPath();g.moveTo(-13,8);g.lineTo(-9,-13);g.lineTo(0,-19);g.lineTo(10,-12);g.lineTo(13,8);g.fill();g.fillStyle='#f2c6a0';g.beginPath();g.arc(0,-7,7,0,7);g.fill();g.strokeStyle='#d6a45b';g.lineWidth=3;g.beginPath();g.arc(12,-1,11,-1.2,1.2);g.stroke()}
  if(u.k==='giant'){g.fillStyle='#8b5e3c';g.beginPath();g.ellipse(0,0,19,24,0,0,7);g.fill();g.fillStyle='#e7b98d';g.beginPath();g.arc(0,-18,12,0,7);g.fill();g.fillStyle='#6b442c';g.fillRect(-13,-27,26,8)}
  if(u.k==='goblin'){g.fillStyle=p?'#15803d':'#b91c1c';g.beginPath();g.moveTo(-8,-7);g.lineTo(-19,-19);g.lineTo(-14,1);g.lineTo(-10,9);g.lineTo(10,9);g.lineTo(14,1);g.lineTo(19,-19);g.lineTo(8,-7);g.fill();g.fillStyle='#86efac';g.beginPath();g.arc(0,-6,9,0,7);g.fill();g.fillStyle='#14532d';g.fillRect(-5,-8,3,3);g.fillRect(3,-8,3,3)}
+ if(u.k==='miniPekka'){g.fillStyle=p?'#1d4ed8':'#991b1b';g.fillRect(-13,-7,26,20);g.fillStyle='#94a3b8';g.fillRect(-12,-21,24,17);g.fillStyle='#e2e8f0';g.fillRect(-8,-17,16,5);g.fillStyle='#cbd5e1';g.fillRect(12,-5,5,24)}
+ if(u.k==='hogRider'){g.fillStyle='#92400e';g.beginPath();g.ellipse(0,5,17,10,0,0,7);g.fill();g.fillStyle='#f2c6a0';g.beginPath();g.arc(0,-12,8,0,7);g.fill();g.fillStyle='#78350f';g.fillRect(-8,-20,16,5);g.fillStyle='#e5e7eb';g.fillRect(8,-18,14,3)}
+ if(u.k==='musketeer'){g.fillStyle=p?'#0e7490':'#9f1239';g.fillRect(-10,-5,20,17);g.fillStyle='#f2c6a0';g.beginPath();g.arc(0,-13,8,0,7);g.fill();g.fillStyle='#1e3a8a';g.fillRect(-9,-23,18,6);g.fillStyle='#cbd5e1';g.fillRect(7,-10,21,3)}
+ if(u.k==='megaKnight'){g.fillStyle=p?'#1e40af':'#7f1d1d';g.fillRect(-18,-4,36,23);g.fillStyle='#64748b';g.beginPath();g.arc(0,-15,17,Math.PI,0);g.lineTo(17,0);g.lineTo(-17,0);g.fill();g.fillStyle='#facc15';g.fillRect(-10,-13,20,4)}
+ if(u.k==='witch'){g.fillStyle=p?'#6d28d9':'#9f1239';g.beginPath();g.moveTo(-15,14);g.lineTo(-10,-12);g.lineTo(0,-24);g.lineTo(12,-10);g.lineTo(16,14);g.fill();g.fillStyle='#f2c6a0';g.beginPath();g.arc(0,-9,7,0,7);g.fill();g.strokeStyle='#c4b5fd';g.lineWidth=4;g.beginPath();g.moveTo(13,-8);g.lineTo(20,-27);g.stroke()}
+ if(u.k==='skeleton'){g.fillStyle='#f8fafc';g.beginPath();g.arc(0,-11,8,0,7);g.fill();g.fillStyle='#111827';g.fillRect(-4,-13,2,3);g.fillRect(2,-13,2,3);g.fillStyle='#e2e8f0';g.fillRect(-3,-2,6,14);g.fillRect(-9,1,18,3);g.fillRect(-8,9,4,9);g.fillRect(4,9,4,9)}
  g.restore();g.fillStyle='#0f172a';g.fillRect(u.x-17,u.y-s.r-13,34,4);g.fillStyle=p?'#93c5fd':'#fca5a5';g.fillRect(u.x-17,u.y-s.r-13,34*Math.max(0,u.hp/u.max),4);
 }
 function draw(){
