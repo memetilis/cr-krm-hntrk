@@ -115,20 +115,28 @@ const specs={
  bananaTower:{name:'Muz Kulesi',icon:'🍌',cost:5,hp:700,dmg:0,range:87.5,speed:0,rate:0,r:23,kind:'unit',building:true,aura:true,deploy:1.0},
  mortar:{name:'Havan',icon:'🏹',cost:4,hp:560,dmg:96,range:300,attackRange:300,speed:0,rate:3.1,r:22,kind:'unit',building:true,defense:true,deploy:.8},
  graveyard:{name:'Mezarlık',icon:'⚰️',cost:5,kind:'spell'},
+ skeletonArmy:{name:'İskelet Ordusu',icon:'💀',cost:3,hp:1,dmg:18,range:21,speed:66,rate:.7,r:8,kind:'unit',swarm:true},
+ mirror:{name:'Ayna',icon:'🪞',cost:1,kind:'spell',mirror:true},
 
 };
 const allCards=Object.keys(specs);
-const aiDeck=['pekka','mortar','bowler','graveyard','fireSpirit','iceSpirit','electroSpirit','fireball'];
+const aiDeck=['pekka','mortar','bowler','graveyard','fireSpirit','skeletonArmy','electroSpirit','fireball'];
 const laneXs=[66,198,330];
 const bridgeXs=[110,286]; // Sol köprü 2 kare sola alındı
 let pickedDeck=[];
-let playerDeck=[],playerHand=[],playerQueue=[],selected='';
+let playerDeck=[],playerHand=[],playerQueue=[],selected='',lastPlayedCard='';
 let aiHand=[],aiQueue=[],aiMana=5;
 let units=[],towers=[],arrows=[],projectiles=[],deployments=[],effects=[],graveyardZones=[];
 let mana=5,pName='Oyuncu',over=true,level=1,aiTimer=2.7,last=0;
 let matchTime=120,suddenDeath=false,poisonZones=[],themeIndex=0,matchResult='';
 const arenaThemes=[{name:'Orman',grass:'#65a85e',water:'#3b82a6',bridge:'#8b6a45'},{name:'Çöl',grass:'#b99a58',water:'#3988a8',bridge:'#80552f'},{name:'Buz',grass:'#8db9c9',water:'#3976a8',bridge:'#b5cbd5'}];
 let trophies=0,coins=100,wins=0,losses=0,cardLevels={},upgradeTarget='';
+function cardCost(k,team='p'){
+ if(k!=='mirror')return specs[k].cost;
+ const previous=team==='e'?aiLastPlayedCard:lastPlayedCard;
+ return previous?specs[previous].cost+1:Infinity;
+}
+let aiLastPlayedCard='';
 let audioCtx=null,soundsEnabled=true,lastSoundAt=0,miniPekkaAudio=null;
 fetch('mini-pekka.b64').then(r=>r.text()).then(b=>{const raw=atob(b.trim()),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);miniPekkaAudio=new Audio(URL.createObjectURL(new Blob([bytes],{type:'audio/mpeg'})));miniPekkaAudio.preload='auto';}).catch(()=>{});
 function playMiniPekka(){if(!soundsEnabled||!miniPekkaAudio)return;try{miniPekkaAudio.pause();miniPekkaAudio.currentTime=0;const p=miniPekkaAudio.play();if(p&&p.catch)p.catch(()=>{});}catch(e){}}
@@ -174,7 +182,7 @@ function renderPicker(){
   const s=specs[k],b=document.createElement('button');
   b.type='button';
   b.className='pick-card'+(pickedDeck.includes(k)?' chosen':'');
-  b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+s.cost+' iksir</span>';
+  const cost=cardCost(k,'p');b.innerHTML=s.icon+' '+s.name+'<br><span class="cost">'+(Number.isFinite(cost)?cost+' iksir':'Önce kart oyna')+'</span>';
   b.disabled=!pickedDeck.includes(k)&&pickedDeck.length>=8;
   b.onclick=()=>{
    upgradeTarget=k;
@@ -199,7 +207,7 @@ function updateHud(){
  $('acrowns').textContent=String(crownsFor('e'));
  const buttons=$('hand').children;
  [...buttons].forEach((b,i)=>{
-  b.disabled=over||mana<specs[playerHand[i]].cost;
+  b.disabled=over||!Number.isFinite(cardCost(playerHand[i],'p'))||mana<cardCost(playerHand[i],'p');
  });
 }
 function renderHand(){
@@ -226,10 +234,11 @@ function cycleAI(k){
  aiHand.splice(i,1);aiQueue.push(k);const next=aiQueue.shift();if(next)aiHand.push(next);
 }
 function spawn(k,team,x,y,forcedCount){
- const s=specs[k],count=forcedCount??(k==='skeleton'?3:1),wait=s.deploy??.58;
+ const actualKey=k==='skeletonArmy'?'skeleton':k;
+ const s=specs[actualKey],count=forcedCount??(k==='skeletonArmy'?15:k==='skeleton'?3:1),wait=s.deploy??.58;
  for(let i=0;i<count;i++){
   const offset=(i-(count-1)/2)*16;
-  deployments.push({k,team,x:Math.max(12,Math.min(W-12,x+offset)),y,wait:wait+i*.08,total:wait+i*.08});
+  deployments.push({k:actualKey,team,x:Math.max(12,Math.min(W-12,x+offset)),y,wait:wait+i*.08,total:wait+i*.08});
  }
  effects.push({x,y,life:.35,spell:'deploy',color:team==='p'?'#bfdbfe':'#fecaca'});
 }
@@ -296,8 +305,10 @@ function cast(k,x,y,team){
 
 function placePlayerCard(x,y){
  if(over||!selected)return;
- const s=specs[selected];
- if(mana<s.cost){$('msg').textContent='Bu kart için yeterli iksirin yok.';return}
+ const chosen=selected,sourceCard=chosen==='mirror'?lastPlayedCard:chosen;
+ if(!sourceCard){$('msg').textContent='Aynayı kullanmak için önce başka bir kart oyna.';return}
+ const s=specs[sourceCard],cost=cardCost(chosen,'p');
+ if(mana<cost){$('msg').textContent='Bu kart için yeterli iksirin yok. ('+cost+' iksir gerekli)';return}
  x=Math.floor(x/CELL)*CELL+CELL/2;y=Math.floor(y/CELL)*CELL+CELL/2;
  const enemyLane=x<198?0:2;
  const enemyGateOpen=towers.some(t=>t.team==='e'&&t.kind==='side'&&t.lane===enemyLane&&t.hp<=0);
@@ -307,10 +318,11 @@ function placePlayerCard(x,y){
   $('msg').textContent='Rakibin bu tarafındaki kuleyi yıkınca oraya kart bırakabilirsin.';return;
  }
  if(s.kind==='unit'&&y>=310&&y<405){$('msg').textContent='Köprüye kart bırakamazsın.';return}
- mana-=s.cost;
- if(s.kind==='spell')cast(selected,x,y,'p');
- else {if(selected==='miniPekka')playMiniPekka();spawn(selected,'p',x,inEnemyTerritory?Math.max(30,Math.min(305,y)):Math.max(415,Math.min(670,y)));}
- const used=selected;
+ mana-=cost;
+ if(s.kind==='spell')cast(sourceCard,x,y,'p');
+ else {if(sourceCard==='miniPekka')playMiniPekka();spawn(sourceCard,'p',x,inEnemyTerritory?Math.max(30,Math.min(305,y)):Math.max(415,Math.min(670,y)));}
+ const used=chosen;
+ if(chosen!=='mirror')lastPlayedCard=chosen;
  playSound('drop');
  cyclePlayer(used);
  updateHud();
@@ -361,6 +373,10 @@ function moveUnit(u,targetInfo,dt){
 function updateUnits(dt){
  for(const u of [...units]){
   if(u.hp<=0)continue;
+  if(specs[u.k].building){
+   u.hp-=u.max*.008*dt;
+   if(u.hp<=0){u.hp=0;playSound('tower');effects.push({x:u.x,y:u.y,life:1.1,spell:'towerfall',team:u.team});continue;}
+  }
   if(u.k==='furnace'){
    u.furnaceCd-=dt;
    if(u.furnaceCd<=0){spawn('fireSpirit',u.team,u.x,u.team==='p'?Math.max(420,u.y-28):Math.min(280,u.y+28));u.furnaceCd=4.6;}
@@ -483,7 +499,7 @@ function updateArrows(dt){
  arrows=keep;
 }
 function aiPlay(){
- const choices=aiHand.filter(k=>specs[k].cost<=aiMana);if(!choices.length)return;
+ const choices=aiHand.filter(k=>cardCost(k,'e')<=aiMana);if(!choices.length)return;
  const playerUnits=units.filter(u=>u.team==='p'&&u.hp>0);
  const aiUnits=units.filter(u=>u.team==='e'&&u.hp>0);
  const hurtAlly=aiUnits.filter(u=>u.hp/u.max<.72).sort((a,b)=>a.hp/a.max-b.hp/b.max)[0];
@@ -504,7 +520,7 @@ function aiPlay(){
   if(specs[k].kind==='unit'&&playerUnits.length===0)score+=.7;
   return {k,score};
  }).sort((a,b)=>b.score-a.score);
- const k=scores[0].k;aiMana=Math.max(0,aiMana-specs[k].cost);
+ const k=scores[0].k;aiMana=Math.max(0,aiMana-cardCost(k,'e'));
  if(specs[k].kind==='spell'){
   if(['fireball','lightning','poison','freeze','arrows','graveyard'].includes(k))cast(k,center.x,center.y,'e');
   else if(k==='heal'&&hurtAlly)cast(k,hurtAlly.x,hurtAlly.y,'e');
@@ -514,6 +530,7 @@ function aiPlay(){
   else{const weak=livingTowers('p').slice().sort((a,b)=>a.hp-b.hp)[0];if(weak)lane=weak.lane;}
   spawn(k,'e',laneXs[lane],Math.random()*75+130);
  }
+ aiLastPlayedCard=k;
  cycleAI(k);
 }
 
@@ -522,7 +539,7 @@ function startMatch(){
  pName=$('playerName').value.trim()||'Oyuncu';
  playerDeck=pickedDeck.slice();
  playerHand=playerDeck.slice(0,4);playerQueue=playerDeck.slice(4);selected=playerHand[0];
- aiHand=aiDeck.slice(0,4);aiQueue=aiDeck.slice(4);aiMana=5;graveyardZones=[];
+ aiHand=aiDeck.slice(0,4);aiQueue=aiDeck.slice(4);aiMana=5;graveyardZones=[];lastPlayedCard='';aiLastPlayedCard='';
  units=[];arrows=[];projectiles=[];deployments=[];effects=[];poisonZones=[];mana=5;aiMana=5;matchTime=120;suddenDeath=false;
  makeTowers();over=false;matchResult='';aiTimer=2.7;last=0;
  $('welcome').style.display='none';
