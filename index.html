@@ -588,11 +588,11 @@ function drawTower(t){
  g.fillStyle=p?'#b9cce0':'#d0b7ba';g.fillRect(left-3,top-5,w+6,4);
  const cannonY=top-15;
  g.save();g.translate(t.x,cannonY);g.rotate(p?-Math.PI/2:Math.PI/2);
- g.fillStyle='#25364b';g.fillRect(-7,-19,14,30);
- g.fillStyle='#71869c';g.fillRect(-9,-17,18,23);
- g.fillStyle='#334155';g.fillRect(-11,-22,22,8);
- g.fillStyle='#cbd5e1';g.fillRect(-12,-24,24,4);
- g.fillStyle='#111827';g.beginPath();g.ellipse(0,-20,7,3,0,0,Math.PI*2);g.fill();
+ g.fillStyle='#25364b';g.fillRect(-19,-7,30,14);
+ g.fillStyle='#71869c';g.fillRect(-17,-9,24,18);
+ g.fillStyle='#334155';g.fillRect(8,-10,10,20);
+ g.fillStyle='#cbd5e1';g.fillRect(13,-11,5,22);
+ g.fillStyle='#111827';g.beginPath();g.ellipse(17,0,3,8,0,0,Math.PI*2);g.fill();
  g.restore();
  const badgeY=top+h*.55;
  g.fillStyle='#26364c';g.beginPath();g.moveTo(t.x,badgeY-15);g.lineTo(t.x+18,badgeY-7);g.lineTo(t.x+15,badgeY+12);g.lineTo(t.x,badgeY+20);g.lineTo(t.x-15,badgeY+12);g.lineTo(t.x-18,badgeY-7);g.closePath();g.fill();
