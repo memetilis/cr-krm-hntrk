@@ -117,12 +117,22 @@ const specs={
  log:{name:'Tomruk',icon:'🪵',cost:2,kind:'spell'},
  zap:{name:'Çarpma',icon:'⚡',cost:2,kind:'spell'},
  rocket:{name:'Roket',icon:'🚀',cost:6,kind:'spell'},
- skeletonArmy:{name:'İskelet Ordusu',icon:'💀',cost:3,hp:1,dmg:18,range:21,speed:66,rate:.7,r:8,kind:'unit',swarm:true},
+ skeletonArmy:{name:'İskelet Ordusu',icon:'💀',cost:3,hp:1,dmg:13,range:21,speed:42,rate:.7,r:8,kind:'unit',swarm:true},
+ armySkeleton:{name:'Ordu İskeleti',icon:'💀',cost:0,hp:1,dmg:13,range:21,speed:42,rate:.7,r:8,kind:'unit'},
  mirror:{name:'Ayna',icon:'🪞',cost:1,kind:'spell',mirror:true},
+ log:{name:'Tomruk',icon:'🪵',cost:2,kind:'spell',range:242},
+ fisherman:{name:'Balıkçı',icon:'🎣',cost:3,hp:390,dmg:43,range:105,attackRange:105,speed:29,rate:1.55,r:16,kind:'unit',ranged:true,deploy:.7},
+ royalGiant:{name:'Kraliyet Devi',icon:'👑',cost:6,hp:760,dmg:76,range:115,attackRange:115,speed:18,rate:1.55,r:22,kind:'unit',ranged:true,targetBuildingsOnly:true,deploy:.9},
+ elixirPump:{name:'İksir Pompası',icon:'🧪',cost:6,hp:620,dmg:0,range:0,speed:0,rate:7,r:22,kind:'unit',building:true,pump:true,deploy:1.0},
+ elixirGolem:{name:'İksir Golemi',icon:'🟣',cost:3,hp:470,dmg:48,range:25,speed:27,rate:1.5,r:21,kind:'unit',targetBuildingsOnly:true,deploy:.9},
+ elixirGolemite:{name:'İksir Golemit',icon:'🟪',cost:0,hp:245,dmg:31,range:24,speed:31,rate:1.35,r:15,kind:'unit',targetBuildingsOnly:true},
+ elixirBlob:{name:'İksir Küresi',icon:'🟣',cost:0,hp:115,dmg:20,range:20,speed:35,rate:1.1,r:10,kind:'unit'},
+ golem:{name:'Golem',icon:'🪨',cost:8,hp:1240,dmg:112,range:27,speed:14,rate:1.9,r:26,kind:'unit',targetBuildingsOnly:true,deploy:1.2},
+ golemite:{name:'Golemit',icon:'🪨',cost:0,hp:370,dmg:64,range:25,speed:20,rate:1.65,r:17,kind:'unit',targetBuildingsOnly:true},
 
 };
-const allCards=Object.keys(specs);
-const aiDeck=['pekka','mortar','bowler','graveyard','skeletonArmy','log','zap','rocket'];
+const allCards=Object.keys(specs).filter(k=>!['armySkeleton','elixirGolemite','elixirBlob','golemite'].includes(k));
+const aiDeck=['golem','elixirGolem','royalGiant','fisherman','elixirPump','mortar','skeletonArmy','rocket'];
 const laneXs=[66,198,330];
 const bridgeXs=[110,286]; // Sol köprü 2 kare sola alındı
 let pickedDeck=[];
@@ -236,7 +246,7 @@ function cycleAI(k){
  aiHand.splice(i,1);aiQueue.push(k);const next=aiQueue.shift();if(next)aiHand.push(next);
 }
 function spawn(k,team,x,y,forcedCount){
- const actualKey=k==='skeletonArmy'?'skeleton':k;
+ const actualKey=k==='skeletonArmy'?'armySkeleton':k;
  const s=specs[actualKey],count=forcedCount??(k==='skeletonArmy'?15:k==='skeleton'?3:1),wait=s.deploy??.58;
  for(let i=0;i<count;i++){
   const offset=(i-(count-1)/2)*16;
@@ -272,7 +282,13 @@ function nearestTower(u){
 function applyDamage(target,amount){
  if(!target)return;
  const before=target.hp;
- target.hp=target.k==='skeleton'&&amount>0?0:Math.max(0,target.hp-amount);
+ target.hp=Math.max(0,target.hp-amount);
+ if(before>0&&target.hp<=0){
+  if(target.k==='golem'&&!target.didSplit){target.didSplit=true;spawn('golemite',target.team,target.x-10,target.y,2);}
+  else if(target.k==='elixirGolem'&&!target.didSplit){target.didSplit=true;spawn('elixirGolemite',target.team,target.x-10,target.y,2);}
+  else if(target.k==='elixirGolemite'&&!target.didSplit){target.didSplit=true;spawn('elixirBlob',target.team,target.x-8,target.y,2);}
+  else if(target.k==='elixirBlob'){if(target.team==='p')aiMana=Math.min(10,aiMana+1);else mana=Math.min(10,mana+1);}
+ }
  if(target.kind==='king'&&before>target.hp&&!target.active){target.active=true;target.openAnim=1.15;effects.push({x:target.x,y:target.y,life:.85,spell:'kingOpen'});}
  if(target.kind&&before>0&&target.hp<=0){playSound('tower');effects.push({x:target.x,y:target.y,life:1.1,spell:'towerfall',team:target.team});}
 }
@@ -303,7 +319,7 @@ function cast(k,x,y,team){
   graveyardZones.push({x,y,team,life:5.2,tick:.1,spawned:0});
   effects.push({x,y,life:1.1,spell:'graveyard'});
  }else if(k==='log'){
-  rollingLogs.push({x,y,team,dir:team==='p'?-1:1,speed:380,travelled:0,maxTravel:360,hit:[]});
+  rollingLogs.push({x,y,team,dir:team==='p'?-1:1,speed:380,travelled:0,maxTravel:specs.log.range,hit:[]});
   effects.push({x,y,life:.45,spell:'logStart'});
  }else if(k==='zap'){
   effects.push({x,y,life:.55,spell:'zap'});
@@ -352,7 +368,7 @@ function bridgeFor(u,target){
  return u.x<198?bridgeXs[0]:bridgeXs[1];
 }
 function getUnitTarget(u){
- const enemies=units.filter(v=>v.team!==u.team&&v.hp>0);
+ const enemies=units.filter(v=>v.team!==u.team&&v.hp>0&&(!specs[u.k].targetBuildingsOnly||specs[v.k].building));
  let close=null,closeD=Infinity;
  for(const v of enemies){
   const d=Math.hypot(v.x-u.x,v.y-u.y);
@@ -392,6 +408,11 @@ function updateUnits(dt){
   if(u.k==='furnace'){
    u.furnaceCd-=dt;
    if(u.furnaceCd<=0){spawn('fireSpirit',u.team,u.x,u.team==='p'?Math.max(420,u.y-28):Math.min(280,u.y+28));u.furnaceCd=4.6;}
+   continue;
+  }
+  if(specs[u.k].pump){
+   u.pumpCd=(u.pumpCd??specs[u.k].rate)-dt;
+   if(u.pumpCd<=0){if(u.team==='p')mana=Math.min(10,mana+1);else aiMana=Math.min(10,aiMana+1);u.pumpCd=specs[u.k].rate;effects.push({x:u.x,y:u.y-24,life:.55,spell:'pump'});}
    continue;
   }
   if(specs[u.k].aura)continue;
@@ -452,6 +473,10 @@ function updateUnits(dt){
      u.hp=0;
     }else if(u.k==='bowler'){
      const d=Math.max(1,Math.hypot(dx,dy));projectiles.push({x:u.x,y:u.y,team:u.team,damage:u.dmg||s.dmg,speed:270,dx:dx/d,dy:dy/d,travelled:0,maxTravel:s.rollRange,radius:22,hitTargets:[],kind:'bowler'});playSound('attack');
+    }else if(u.k==='fisherman'){
+     const oldX=info.target.x,oldY=info.target.y;
+     if(!info.isTower&&!specs[info.target.k]?.building){const d=Math.max(1,Math.hypot(dx,dy));info.target.x=u.x+dx/d*48;info.target.y=u.y+dy/d*48;}
+     applyDamage(info.target,u.dmg||s.dmg);effects.push({x:u.x,y:u.y,tx:oldX,ty:oldY,life:.35,spell:'hook'});
     }else if(s.ranged||s.flying||s.range>65){
      projectiles.push({x:u.x,y:u.y,target:info.target,team:u.team,damage:u.dmg||s.dmg,speed:s.flying?290:380,splash:s.flying?43:u.k==='princess'?32:0,kind:u.k});playSound('attack');
     }else{
@@ -678,6 +703,15 @@ function drawUnit(u){
  const p=u.team==='p',s=specs[u.k];
  if(u.k==='bananaTower'){g.fillStyle=p?'#1d4ed8':'#b91c1c';g.globalAlpha=.10;g.beginPath();g.arc(u.x,u.y,s.range,0,Math.PI*2);g.fill();g.globalAlpha=1;g.fillStyle='#0f172a66';g.beginPath();g.ellipse(u.x,u.y+12,32,9,0,0,Math.PI*2);g.fill();g.fillStyle='#a16207';g.fillRect(u.x-22,u.y-30,44,42);g.font='29px Arial';g.textAlign='center';g.fillText('🍌',u.x,u.y-5);g.fillStyle='#0f172a';g.fillRect(u.x-24,u.y-43,48,4);g.fillStyle=p?'#93c5fd':'#fca5a5';g.fillRect(u.x-24,u.y-43,48*Math.max(0,u.hp/u.max),4);g.fillStyle='#fff';g.font='10px Arial';g.fillText('MUZ KULESİ',u.x,u.y+25);return;}
  if(s.defense){g.fillStyle='#0f172a66';g.beginPath();g.ellipse(u.x,u.y+10,25,8,0,0,Math.PI*2);g.fill();g.fillStyle=p?'#1d4ed8':'#b91c1c';g.fillRect(u.x-20,u.y-20,40,30);g.font='27px Arial';g.textAlign='center';g.fillText(u.k==='tesla'?'⚡':u.k==='mortar'?'🏹':'💣',u.x,u.y+1);g.fillStyle='#0f172a';g.fillRect(u.x-23,u.y-29,46,4);g.fillStyle=p?'#93c5fd':'#fca5a5';g.fillRect(u.x-23,u.y-29,46*Math.max(0,u.hp/u.max),4);g.fillStyle='#fff';g.font='10px Arial';g.fillText(u.k==='tesla'?'TESLA':u.k==='mortar'?'HAVAN':'TOP',u.x,u.y+24);return;}
+ if(s.pump){
+  g.fillStyle='#0f172a66';g.beginPath();g.ellipse(u.x,u.y+12,30,9,0,0,Math.PI*2);g.fill();
+  g.fillStyle=p?'#1e3a8a':'#7f1d1d';g.fillRect(u.x-23,u.y-25,46,38);
+  g.fillStyle='#94a3b8';g.fillRect(u.x-19,u.y-31,38,8);
+  g.fillStyle='#c4b5fd';g.beginPath();g.arc(u.x,u.y-17,9,0,Math.PI*2);g.fill();
+  g.fillStyle='#7c3aed';g.fillRect(u.x-5,u.y-20,10,18);
+  g.fillStyle='#0f172a';g.fillRect(u.x-24,u.y-43,48,4);g.fillStyle=p?'#93c5fd':'#fca5a5';g.fillRect(u.x-24,u.y-43,48*Math.max(0,u.hp/u.max),4);
+  g.fillStyle='#fff';g.font='10px Arial';g.textAlign='center';g.fillText('İKSİR POMPASI',u.x,u.y+25);return;
+ }
  if(u.k==='furnace'){
   g.fillStyle='#0f172a66';g.beginPath();g.ellipse(u.x,u.y+11,29,9,0,0,Math.PI*2);g.fill();
   g.fillStyle=p?'#172554':'#7f1d1d';g.beginPath();g.moveTo(u.x-20,u.y-24);g.lineTo(u.x+15,u.y-31);g.lineTo(u.x+23,u.y+9);g.lineTo(u.x-20,u.y+15);g.closePath();g.fill();
@@ -759,6 +793,8 @@ function draw(){
   else if(e.spell==='rocketExplosion'){const q=1-e.life/.9;g.fillStyle='#f97316';g.beginPath();g.arc(e.x,e.y,18+q*54,0,Math.PI*2);g.fill();g.fillStyle='#fde68a';g.beginPath();g.arc(e.x,e.y,10+q*28,0,Math.PI*2);g.fill();}
   else if(e.spell==='logStart'){g.fillStyle='#a16207';g.fillRect(e.x-18,e.y-7,36,14)}
   else if(e.spell==='logHit'){g.strokeStyle='#d6d3d1';g.lineWidth=3;g.beginPath();g.arc(e.x,e.y,8+(1-e.life/.32)*18,0,Math.PI*2);g.stroke()}
+  else if(e.spell==='hook'){g.strokeStyle='#fef3c7';g.lineWidth=3;g.beginPath();g.moveTo(e.x,e.y);g.lineTo(e.tx,e.ty);g.stroke();g.fillStyle='#f59e0b';g.beginPath();g.arc(e.tx,e.ty,6,0,Math.PI*2);g.fill()}
+  else if(e.spell==='pump'){g.fillStyle='#c4b5fd';g.font='bold 16px Arial';g.textAlign='center';g.fillText('+1 💧',e.x,e.y-12)}
   else if(e.spell==='freeze'){g.strokeStyle='#bae6fd';g.lineWidth=6;g.beginPath();g.arc(e.x,e.y,75*(1-e.life/1.1)+12,0,Math.PI*2);g.stroke()}
   else if(e.spell==='poison'||e.spell==='arrows'){g.fillStyle=e.spell==='poison'?'#a3e635':'#e2e8f0';g.globalAlpha=.4;g.beginPath();g.arc(e.x,e.y,82,0,Math.PI*2);g.fill();g.globalAlpha=1}
   else if(e.spell==='towerfall'){const q=1-e.life/1.1;g.fillStyle='#94a3b8';for(let i=0;i<8;i++){const a=i*Math.PI/4,d=10+q*35;g.save();g.translate(e.x+Math.cos(a)*d,e.y+Math.sin(a)*d);g.rotate(a);g.fillRect(-5,-4,10,8);g.restore()}g.fillStyle='#cbd5e1';g.globalAlpha=.25*(1-q);g.beginPath();g.ellipse(e.x,e.y+8,20+q*48,8+q*12,0,0,Math.PI*2);g.fill()}else if(e.spell==='kingOpen'){g.strokeStyle='#fde68a';g.lineWidth=4;g.beginPath();g.arc(e.x,e.y,16+(1-e.life/.85)*50,0,Math.PI*2);g.stroke()}else if(e.spell==='jump'){g.fillStyle='#fef08a';g.beginPath();g.arc(e.x,e.y,48*(1-e.life/.85)+8,0,Math.PI*2);g.fill()}
