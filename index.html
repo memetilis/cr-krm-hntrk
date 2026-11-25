@@ -89,7 +89,6 @@ const specs={
  knight:{name:'Şövalye',icon:'🛡️',cost:3,hp:190,dmg:31,range:27,speed:38,rate:.85,r:15,kind:'unit'},
  archer:{name:'Okçu',icon:'🏹',cost:3,hp:105,dmg:22,range:112,speed:31,rate:1.05,r:12,kind:'unit'},
  giant:{name:'Dev',icon:'🗿',cost:5,hp:500,dmg:67,range:28,speed:17,rate:1.5,r:20,kind:'unit'},
- goblin:{name:'Goblin',icon:'👺',cost:2,hp:82,dmg:24,range:24,speed:59,rate:.62,r:11,kind:'unit'},
  fireball:{name:'Ateş Topu',icon:'🔥',cost:4,kind:'spell'},
  heal:{name:'İyileştirme',icon:'💚',cost:3,kind:'spell'},
  lightning:{name:'Yıldırım',icon:'⚡',cost:5,kind:'spell'},
@@ -115,18 +114,21 @@ const specs={
  bananaTower:{name:'Muz Kulesi',icon:'🍌',cost:5,hp:700,dmg:0,range:87.5,speed:0,rate:0,r:23,kind:'unit',building:true,aura:true,deploy:1.0},
  mortar:{name:'Havan',icon:'🏹',cost:4,hp:560,dmg:96,range:300,attackRange:300,speed:0,rate:3.1,r:22,kind:'unit',building:true,defense:true,deploy:.8},
  graveyard:{name:'Mezarlık',icon:'⚰️',cost:5,kind:'spell'},
+ log:{name:'Tomruk',icon:'🪵',cost:2,kind:'spell'},
+ zap:{name:'Çarpma',icon:'⚡',cost:2,kind:'spell'},
+ rocket:{name:'Roket',icon:'🚀',cost:6,kind:'spell'},
  skeletonArmy:{name:'İskelet Ordusu',icon:'💀',cost:3,hp:1,dmg:18,range:21,speed:66,rate:.7,r:8,kind:'unit',swarm:true},
  mirror:{name:'Ayna',icon:'🪞',cost:1,kind:'spell',mirror:true},
 
 };
 const allCards=Object.keys(specs);
-const aiDeck=['pekka','mortar','bowler','graveyard','fireSpirit','skeletonArmy','electroSpirit','fireball'];
+const aiDeck=['pekka','mortar','bowler','graveyard','skeletonArmy','log','zap','rocket'];
 const laneXs=[66,198,330];
 const bridgeXs=[110,286]; // Sol köprü 2 kare sola alındı
 let pickedDeck=[];
 let playerDeck=[],playerHand=[],playerQueue=[],selected='',lastPlayedCard='';
 let aiHand=[],aiQueue=[],aiMana=5;
-let units=[],towers=[],arrows=[],projectiles=[],deployments=[],effects=[],graveyardZones=[];
+let units=[],towers=[],arrows=[],projectiles=[],deployments=[],effects=[],graveyardZones=[],rollingLogs=[],rocketStrikes=[];
 let mana=5,pName='Oyuncu',over=true,level=1,aiTimer=2.7,last=0;
 let matchTime=120,suddenDeath=false,poisonZones=[],themeIndex=0,matchResult='';
 const arenaThemes=[{name:'Orman',grass:'#65a85e',water:'#3b82a6',bridge:'#8b6a45'},{name:'Çöl',grass:'#b99a58',water:'#3988a8',bridge:'#80552f'},{name:'Buz',grass:'#8db9c9',water:'#3976a8',bridge:'#b5cbd5'}];
@@ -300,6 +302,16 @@ function cast(k,x,y,team){
  }else if(k==='graveyard'){
   graveyardZones.push({x,y,team,life:5.2,tick:.1,spawned:0});
   effects.push({x,y,life:1.1,spell:'graveyard'});
+ }else if(k==='log'){
+  rollingLogs.push({x,y,team,dir:team==='p'?-1:1,speed:380,travelled:0,maxTravel:360,hit:[]});
+  effects.push({x,y,life:.45,spell:'logStart'});
+ }else if(k==='zap'){
+  effects.push({x,y,life:.55,spell:'zap'});
+  units.filter(u=>u.team!==team&&u.hp>0&&Math.hypot(u.x-x,u.y-y)<62).forEach(u=>{applyDamage(u,88);u.frozen=Math.max(u.frozen||0,.55);});
+  towers.filter(t=>t.team!==team&&t.hp>0&&Math.hypot(t.x-x,t.y-y)<48).forEach(t=>applyDamage(t,45));
+ }else if(k==='rocket'){
+  rocketStrikes.push({x,y,team,delay:.85});
+  effects.push({x,y,life:.9,spell:'rocketIncoming'});
  }
 }
 
@@ -510,6 +522,9 @@ function aiPlay(){
   let score=Math.random()*.35;
   if(k==='heal'&&hurtAlly)score+=3.8;
   if(k==='fireball'&&playerUnits.length>=2)score+=2.8;
+  if(k==='rocket'&&playerUnits.length>=2)score+=3.1;
+  if(k==='zap'&&playerUnits.length)score+=1.8;
+  if(k==='log'&&playerUnits.length>=2)score+=2.4;
   if(k==='lightning'&&playerUnits.length>=2)score+=3.2;
   if(k==='arrows'&&playerUnits.length>=2)score+=2.5;
   if(k==='poison'&&playerUnits.length>=2)score+=2.1;
@@ -522,7 +537,7 @@ function aiPlay(){
  }).sort((a,b)=>b.score-a.score);
  const k=scores[0].k;aiMana=Math.max(0,aiMana-cardCost(k,'e'));
  if(specs[k].kind==='spell'){
-  if(['fireball','lightning','poison','freeze','arrows','graveyard'].includes(k))cast(k,center.x,center.y,'e');
+  if(['fireball','lightning','poison','freeze','arrows','graveyard','log','zap','rocket'].includes(k))cast(k,center.x,center.y,'e');
   else if(k==='heal'&&hurtAlly)cast(k,hurtAlly.x,hurtAlly.y,'e');
  }else{
   let lane=1;
@@ -538,7 +553,7 @@ function startMatch(){
  if(pickedDeck.length!==8)return;
  pName=$('playerName').value.trim()||'Oyuncu';
  playerDeck=pickedDeck.slice();
- playerHand=playerDeck.slice(0,4);playerQueue=playerDeck.slice(4);selected=playerHand[0];
+ playerHand=playerDeck.slice(0,4);playerQueue=playerDeck.slice(4);selected=playerHand[0];rollingLogs=[];rocketStrikes=[];
  aiHand=aiDeck.slice(0,4);aiQueue=aiDeck.slice(4);aiMana=5;graveyardZones=[];lastPlayedCard='';aiLastPlayedCard='';
  units=[];arrows=[];projectiles=[];deployments=[];effects=[];poisonZones=[];mana=5;aiMana=5;matchTime=120;suddenDeath=false;
  makeTowers();over=false;matchResult='';aiTimer=2.7;last=0;
@@ -565,6 +580,23 @@ function endMatch(prevP,prevE){
  }
 }
 function clockText(){const sec=Math.max(0,Math.ceil(matchTime));return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0')+(suddenDeath?' uz.':'');}
+function updateSpecialSpells(dt){
+ const keepLogs=[];
+ for(const log of rollingLogs){
+  const step=log.speed*dt;log.y+=log.dir*step;log.travelled+=step;
+  const targets=[...units.filter(u=>u.team!==log.team&&u.hp>0),...towers.filter(t=>t.team!==log.team&&t.hp>0)];
+  for(const target of targets){if(log.hit.includes(target))continue;const radius=(target.r||30)+13;if(Math.abs(target.x-log.x)<=30&&Math.abs(target.y-log.y)<=radius){applyDamage(target,target.kind?82:105);log.hit.push(target);if(!target.kind)target.y=Math.max(30,Math.min(H-30,target.y+log.dir*16));effects.push({x:target.x,y:target.y,life:.32,spell:'logHit'});}}
+  if(log.travelled<log.maxTravel&&log.y>0&&log.y<H)keepLogs.push(log);
+ }
+ rollingLogs=keepLogs;
+ const rockets=[];
+ for(const rocket of rocketStrikes){rocket.delay-=dt;if(rocket.delay<=0){
+  units.filter(u=>u.team!==rocket.team&&u.hp>0&&Math.hypot(u.x-rocket.x,u.y-rocket.y)<68).forEach(u=>applyDamage(u,275));
+  towers.filter(t=>t.team!==rocket.team&&t.hp>0&&Math.hypot(t.x-rocket.x,t.y-rocket.y)<62).forEach(t=>applyDamage(t,220));
+  effects.push({x:rocket.x,y:rocket.y,life:.9,spell:'rocketExplosion'});
+ }else rockets.push(rocket);}
+ rocketStrikes=rockets;
+}
 function update(dt){
  if(over)return;
  matchTime-=dt;
@@ -581,7 +613,7 @@ function update(dt){
  aiTimer-=dt;
  if(aiTimer<=0){aiPlay();aiTimer=(level===0?5.1:level===2?2.6:3.8)+Math.random()*1.1;}
  const beforeP=livingTowers('p').length,beforeE=livingTowers('e').length;
- updateUnits(dt);updateDeployAndProjectiles(dt);updateTowers(dt);updateArrows(dt);
+ updateUnits(dt);updateDeployAndProjectiles(dt);updateSpecialSpells(dt);updateTowers(dt);updateArrows(dt);
  poisonZones.forEach(z=>{
   z.life-=dt;z.tick-=dt;
   if(z.tick<=0){
@@ -707,6 +739,7 @@ function draw(){
  drawDeployments();
  units.slice().sort((a,b)=>a.y-b.y).forEach(drawUnit);
  projectiles.forEach(p=>{if(p.kind==='bowler'){g.fillStyle='#78716c';g.beginPath();g.arc(p.x,p.y,11,0,Math.PI*2);g.fill();g.strokeStyle='#292524';g.lineWidth=2;g.stroke();}else if(p.kind==='mortar'){g.fillStyle='#292524';g.beginPath();g.arc(p.x,p.y,8,0,Math.PI*2);g.fill();g.strokeStyle='#fcd34d';g.lineWidth=2;g.stroke();}else{g.fillStyle=p.team==='p'?'#e0f2fe':'#fee2e2';g.beginPath();g.arc(p.x,p.y,4,0,Math.PI*2);g.fill();}});
+ rollingLogs.forEach(log=>{g.save();g.translate(log.x,log.y);g.rotate(log.dir*log.travelled/12);g.fillStyle='#713f12';g.beginPath();g.ellipse(0,0,24,10,0,0,Math.PI*2);g.fill();g.fillStyle='#a16207';g.fillRect(-15,-7,30,14);g.strokeStyle='#422006';g.lineWidth=2;g.strokeRect(-15,-7,30,14);g.restore();});
  poisonZones.forEach(z=>{g.fillStyle='#84cc16';g.globalAlpha=.2;g.beginPath();g.arc(z.x,z.y,82,0,Math.PI*2);g.fill();g.globalAlpha=1;});
  graveyardZones.forEach(z=>{g.save();g.globalAlpha=.2;g.fillStyle='#7e22ce';g.beginPath();g.arc(z.x,z.y,72,0,Math.PI*2);g.fill();g.globalAlpha=.8;g.font='19px Arial';g.textAlign='center';g.fillText('⚰️',z.x,z.y-14);g.fillText('🪦',z.x-25,z.y+20);g.fillText('🪦',z.x+25,z.y+20);g.restore();});
  arrows.forEach(a=>{
@@ -721,6 +754,11 @@ function draw(){
   if(e.spell==='fire'){g.fillStyle='#fb923c';g.beginPath();g.arc(e.x,e.y,76*(1-e.life/.75)+10,0,Math.PI*2);g.fill()}
   else if(e.spell==='heal'){g.strokeStyle='#4ade80';g.lineWidth=7;g.beginPath();g.arc(e.x,e.y,58*(1-e.life/.75)+8,0,Math.PI*2);g.stroke()}
   else if(e.spell==='lightning'){g.strokeStyle='#fef08a';g.lineWidth=5;g.beginPath();g.moveTo(e.x-18,e.y-34);g.lineTo(e.x+4,e.y-8);g.lineTo(e.x-8,e.y+5);g.lineTo(e.x+17,e.y+34);g.stroke()}
+  else if(e.spell==='zap'){const q=1-e.life/.55;g.strokeStyle='#a5f3fc';g.lineWidth=4;for(let i=0;i<8;i++){const a=i*Math.PI/4,r=18+q*48;g.beginPath();g.moveTo(e.x+Math.cos(a)*8,e.y+Math.sin(a)*8);g.lineTo(e.x+Math.cos(a)*r,e.y+Math.sin(a)*r);g.stroke();}g.fillStyle='#e0f2fe';g.beginPath();g.arc(e.x,e.y,10+q*18,0,Math.PI*2);g.fill()}
+  else if(e.spell==='rocketIncoming'){const q=1-e.life/.9;g.strokeStyle='#fb923c';g.lineWidth=4;g.beginPath();g.arc(e.x,e.y,18+q*34,0,Math.PI*2);g.stroke();g.fillStyle='#fef3c7';g.font='30px Arial';g.textAlign='center';g.fillText('🚀',e.x,e.y-40-q*32)}
+  else if(e.spell==='rocketExplosion'){const q=1-e.life/.9;g.fillStyle='#f97316';g.beginPath();g.arc(e.x,e.y,18+q*54,0,Math.PI*2);g.fill();g.fillStyle='#fde68a';g.beginPath();g.arc(e.x,e.y,10+q*28,0,Math.PI*2);g.fill();}
+  else if(e.spell==='logStart'){g.fillStyle='#a16207';g.fillRect(e.x-18,e.y-7,36,14)}
+  else if(e.spell==='logHit'){g.strokeStyle='#d6d3d1';g.lineWidth=3;g.beginPath();g.arc(e.x,e.y,8+(1-e.life/.32)*18,0,Math.PI*2);g.stroke()}
   else if(e.spell==='freeze'){g.strokeStyle='#bae6fd';g.lineWidth=6;g.beginPath();g.arc(e.x,e.y,75*(1-e.life/1.1)+12,0,Math.PI*2);g.stroke()}
   else if(e.spell==='poison'||e.spell==='arrows'){g.fillStyle=e.spell==='poison'?'#a3e635':'#e2e8f0';g.globalAlpha=.4;g.beginPath();g.arc(e.x,e.y,82,0,Math.PI*2);g.fill();g.globalAlpha=1}
   else if(e.spell==='towerfall'){const q=1-e.life/1.1;g.fillStyle='#94a3b8';for(let i=0;i<8;i++){const a=i*Math.PI/4,d=10+q*35;g.save();g.translate(e.x+Math.cos(a)*d,e.y+Math.sin(a)*d);g.rotate(a);g.fillRect(-5,-4,10,8);g.restore()}g.fillStyle='#cbd5e1';g.globalAlpha=.25*(1-q);g.beginPath();g.ellipse(e.x,e.y+8,20+q*48,8+q*12,0,0,Math.PI*2);g.fill()}else if(e.spell==='kingOpen'){g.strokeStyle='#fde68a';g.lineWidth=4;g.beginPath();g.arc(e.x,e.y,16+(1-e.life/.85)*50,0,Math.PI*2);g.stroke()}else if(e.spell==='jump'){g.fillStyle='#fef08a';g.beginPath();g.arc(e.x,e.y,48*(1-e.life/.85)+8,0,Math.PI*2);g.fill()}
