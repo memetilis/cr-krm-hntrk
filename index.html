@@ -49,7 +49,7 @@ input{width:100%;padding:10px;border-radius:9px;border:1px solid #94a3b8;backgro
  <div class="pill">🔴 YAPAY ZEKÂ<br>👑 <span id="acrowns">0</span>/3 taç</div>
 </div>
 <div class="record" id="record">🏆 0 kupa · ✅ 0 galibiyet · ❌ 0 mağlubiyet · 🪙 100 altın</div>
-<canvas id="arena" width="420" height="700"></canvas>
+<canvas id="arena" width="396" height="704"></canvas>
 <div class="battle-bottom"><div class="mana-box">🔵 Sen: <strong id="mana">5.0</strong>/10</div><div class="mana-box">🔴 YZ: <strong id="aimana">5.0</strong>/10</div></div>
 <div id="hand" class="hand"></div><div class="next-card" id="nextPreview">Sonraki kart: —</div>
 <div class="hint">8 kartlık destenle oyna. Elinde 4 kart bulunur. Kuleleri yıkınca her biri 1 taç kazandırır. İki köprüden geç; kulelerin ok atar.</div>
@@ -83,7 +83,7 @@ input{width:100%;padding:10px;border-radius:9px;border:1px solid #94a3b8;backgro
 (()=>{
 const cv=document.getElementById('arena');
 const g=cv.getContext('2d');
-const W=420,H=700;
+const W=396,H=704,CELL=22,GRID_COLS=18,GRID_ROWS=32;
 const $=id=>document.getElementById(id);
 const specs={
  knight:{name:'Şövalye',icon:'🛡️',cost:3,hp:190,dmg:31,range:27,speed:38,rate:.85,r:15,kind:'unit'},
@@ -107,19 +107,19 @@ const specs={
  electroSpirit:{name:'Elektrik Ruhu',icon:'⚡',cost:1,hp:68,dmg:35,range:62,speed:74,rate:.7,r:9,kind:'unit',spirit:'electric',deploy:.18},
  pekka:{name:'P.E.K.K.A',icon:'🦾',cost:7,hp:880,dmg:178,range:29,speed:17,rate:1.8,r:24,kind:'unit',deploy:1.05},
  babyDragon:{name:'Yavru Ejder',icon:'🐉',cost:4,hp:390,dmg:46,range:112,speed:32,rate:1.15,r:17,kind:'unit',flying:true,deploy:.65},
- princess:{name:'Prenses',icon:'👸',cost:3,hp:175,dmg:42,range:364,attackRange:364,speed:25,rate:1.25,r:12,kind:'unit',ranged:true,deploy:.55},
+ princess:{name:'Prenses',icon:'👸',cost:3,hp:175,dmg:42,range:374,attackRange:374,speed:25,rate:1.25,r:12,kind:'unit',ranged:true,deploy:.55},
  magicArcher:{name:'Büyülü Okçu',icon:'🪄',cost:4,hp:225,dmg:49,range:112,attackRange:224,speed:27,rate:1.25,r:13,kind:'unit',ranged:true,deploy:.6},
- atici:{name:'Atıcı',icon:'🪨',cost:3,hp:440,dmg:68,range:140,attackRange:196,speed:25,rate:1.65,r:18,kind:'unit',ranged:true,deploy:.7},
+ bowler:{name:'Bowler',icon:'🪨',cost:5,hp:590,dmg:76,range:110,attackRange:110,speed:23,rate:1.7,r:20,kind:'unit',ranged:true,rollRange:154,deploy:.7},
  furnace:{name:'Fırın',icon:'🔥',cost:4,hp:590,dmg:0,range:0,speed:0,rate:4.6,r:21,kind:'unit',building:true,deploy:.9},
  cannon:{name:'Top',icon:'💣',cost:3,hp:520,dmg:72,range:165,attackRange:165,speed:0,rate:1.15,r:19,kind:'unit',building:true,defense:true,deploy:.65},
  tesla:{name:'Tesla',icon:'⚡',cost:4,hp:460,dmg:86,range:180,attackRange:180,speed:0,rate:1.35,r:18,kind:'unit',building:true,defense:true,deploy:.7},
- bananaTower:{name:'Muz Kulesi',icon:'🍌',cost:9,hp:700,dmg:0,range:87.5,speed:0,rate:0,r:23,kind:'unit',building:true,aura:true,deploy:1.0},
+ bananaTower:{name:'Muz Kulesi',icon:'🍌',cost:5,hp:700,dmg:0,range:87.5,speed:0,rate:0,r:23,kind:'unit',building:true,aura:true,deploy:1.0},
 
 };
 const allCards=Object.keys(specs);
-const aiDeck=['pekka','babyDragon','atici','furnace','fireSpirit','iceSpirit','electroSpirit','fireball'];
-const laneXs=[65,210,355];
-const bridgeXs=[140,280];
+const aiDeck=['pekka','babyDragon','bowler','furnace','fireSpirit','iceSpirit','electroSpirit','fireball'];
+const laneXs=[66,198,330];
+const bridgeXs=[154,286];
 let pickedDeck=[];
 let playerDeck=[],playerHand=[],playerQueue=[],selected='';
 let aiHand=[],aiQueue=[],aiMana=5;
@@ -296,6 +296,7 @@ function placePlayerCard(x,y){
  if(mana<s.cost){$('msg').textContent='Bu kart için yeterli iksirin yok.';return}
  if(s.kind==='unit'&&y<405){$('msg').textContent='Birliklerini kendi tarafına yerleştir.';return}
  mana-=s.cost;
+ x=Math.floor(x/CELL)*CELL+CELL/2;y=Math.floor(y/CELL)*CELL+CELL/2;
  if(s.kind==='spell')cast(selected,x,y,'p');
  else {if(selected==='miniPekka')playMiniPekka();spawn(selected,'p',x,Math.max(415,Math.min(670,y)));}
  const used=selected;
@@ -313,7 +314,7 @@ cv.addEventListener('pointerdown',e=>{
 function bridgeFor(u,target){
  if(target.lane===0)return bridgeXs[0];
  if(target.lane===2)return bridgeXs[1];
- return u.x<210?bridgeXs[0]:bridgeXs[1];
+ return u.x<198?bridgeXs[0]:bridgeXs[1];
 }
 function getUnitTarget(u){
  const enemies=units.filter(v=>v.team!==u.team&&v.hp>0);
@@ -328,6 +329,11 @@ function getUnitTarget(u){
  if(close)return {target:close,distance:closeD,isTower:false};
  return null;
 }
+function attackCooldown(team,x,y,base){
+ let rate=base;
+ for(const aura of units){if(aura.k!=='bananaTower'||aura.hp<=0)continue;if(Math.hypot(x-aura.x,y-aura.y)<=specs.bananaTower.range)rate*=team===aura.team?(1/1.5):1.15;}
+ return rate;
+}
 function moveUnit(u,targetInfo,dt){
  const target=targetInfo.target;
  let dest={x:target.x,y:target.y};
@@ -337,8 +343,7 @@ function moveUnit(u,targetInfo,dt){
  }
  const dx=dest.x-u.x,dy=dest.y-u.y,d=Math.max(1,Math.hypot(dx,dy));
  const s=specs[u.k];
- let speed=s.speed;for(const aura of units){if(aura.k!=='bananaTower'||aura.hp<=0)continue;const dist=Math.hypot(u.x-aura.x,u.y-aura.y);if(dist<=specs.bananaTower.range)speed*=u.team===aura.team?1.25:.65;}
- u.x+=dx/d*speed*dt;
+ u.x+=dx/d*s.speed*dt;
  u.y+=dy/d*s.speed*dt;
  u.y=Math.max(82,Math.min(660,u.y));
 }
@@ -350,9 +355,10 @@ function updateUnits(dt){
    if(u.furnaceCd<=0){spawn('fireSpirit',u.team,u.x,u.team==='p'?Math.max(420,u.y-28):Math.min(280,u.y+28));u.furnaceCd=4.6;}
    continue;
   }
+  if(specs[u.k].aura)continue;
   if(specs[u.k].defense){
    u.cd-=dt;const targets=units.filter(v=>v.team!==u.team&&v.hp>0&&Math.hypot(v.x-u.x,v.y-u.y)<=specs[u.k].range).sort((a,b)=>Math.hypot(a.x-u.x,a.y-u.y)-Math.hypot(b.x-u.x,b.y-u.y));
-   if(targets.length&&u.cd<=0){projectiles.push({x:u.x,y:u.y-12,target:targets[0],team:u.team,damage:u.dmg,speed:420,splash:u.k==='cannon'?20:0,kind:u.k});u.cd=specs[u.k].rate;playSound('attack');}
+   if(targets.length&&u.cd<=0){projectiles.push({x:u.x,y:u.y-12,target:targets[0],team:u.team,damage:u.dmg,speed:420,splash:u.k==='cannon'?20:0,kind:u.k});u.cd=attackCooldown(u.team,u.x,u.y,specs[u.k].rate);playSound('attack');}
    continue;
   }
   if(u.frozen>0){u.frozen=Math.max(0,u.frozen-dt);u.attackAnim=0;continue;}
@@ -392,7 +398,7 @@ function updateUnits(dt){
   if(info.distance<=(specs[u.k].attackRange||specs[u.k].range)+(info.isTower?5:8)){
    if(u.cd<=0){
     const s=specs[u.k],dx=info.target.x-u.x,dy=info.target.y-u.y;
-    u.attackDir=Math.atan2(dy,dx);u.attackAnim=.28;u.cd=s.rate;playSound('attack');
+    u.attackDir=Math.atan2(dy,dx);u.attackAnim=.28;u.cd=attackCooldown(u.team,u.x,u.y,s.rate);playSound('attack');
     if(s.spirit){
      const radius=s.spirit==='electric'?82:66;
      const nearby=units.filter(v=>v.team!==u.team&&v.hp>0&&Math.hypot(v.x-u.x,v.y-u.y)<radius).slice(0,s.spirit==='electric'?3:5);
@@ -404,8 +410,10 @@ function updateUnits(dt){
      if(info.isTower)applyDamage(info.target,(u.dmg||s.dmg)*.8);
      effects.push({x:u.x,y:u.y,life:.55,spell:s.spirit==='fire'?'fire':s.spirit==='ice'?'freeze':'lightning'});
      u.hp=0;
+    }else if(u.k==='bowler'){
+     const d=Math.max(1,Math.hypot(dx,dy));projectiles.push({x:u.x,y:u.y,team:u.team,damage:u.dmg||s.dmg,speed:270,dx:dx/d,dy:dy/d,travelled:0,maxTravel:s.rollRange,radius:22,hitTargets:[],kind:'bowler'});playSound('attack');
     }else if(s.ranged||s.flying||s.range>65){
-     projectiles.push({x:u.x,y:u.y,target:info.target,team:u.team,damage:u.dmg||s.dmg,speed:s.flying?290:u.k==='atici'?245:380,splash:s.flying?43:u.k==='atici'?36:0,kind:u.k});playSound('attack');
+     projectiles.push({x:u.x,y:u.y,target:info.target,team:u.team,damage:u.dmg||s.dmg,speed:s.flying?290:380,splash:s.flying?43:u.k==='princess'?32:0,kind:u.k});playSound('attack');
     }else{
      applyDamage(info.target,u.dmg||s.dmg);
      effects.push({x:info.target.x,y:info.target.y,life:.18,spell:'hit'});
@@ -419,6 +427,13 @@ function updateDeployAndProjectiles(dt){
  updateDeployments(dt);
  const remain=[];
  for(const p of projectiles){
+  if(p.kind==='bowler'){
+   p.x+=p.dx*p.speed*dt;p.y+=p.dy*p.speed*dt;p.travelled+=p.speed*dt;
+   const targets=[...units.filter(v=>v.team!==p.team&&v.hp>0),...towers.filter(v=>v.team!==p.team&&v.hp>0)];
+   for(const target of targets){if(p.hitTargets.includes(target))continue;const hitRadius=p.radius+(target.r||25);if(Math.hypot(target.x-p.x,target.y-p.y)<=hitRadius){applyDamage(target,p.damage);p.hitTargets.push(target);effects.push({x:target.x,y:target.y,life:.28,spell:'hit'});}}
+   if(p.travelled<p.maxTravel&&p.x>=0&&p.x<=W&&p.y>=0&&p.y<=H)remain.push(p);
+   continue;
+  }
   if(!p.target||p.target.hp<=0)continue;
   const tx=p.target.x,ty=p.target.y,dx=tx-p.x,dy=ty-p.y,d=Math.max(1,Math.hypot(dx,dy));
   if(d<=p.speed*dt+6){
@@ -442,7 +457,7 @@ function updateTowers(dt){
   if(!targets.length)continue;
   targets.sort((a,b)=>Math.hypot(a.x-t.x,a.y-t.y)-Math.hypot(b.x-t.x,b.y-t.y));
   arrows.push({x:t.x,y:t.y+(t.team==='p'?-18:18),target:targets[0],team:t.team,speed:390,damage:28});
-  t.cooldown=1.05;
+  t.cooldown=attackCooldown(t.team,t.x,t.y,1.05);
  }
 }
 function updateArrows(dt){
@@ -461,7 +476,7 @@ function aiPlay(){
  const aiUnits=units.filter(u=>u.team==='e'&&u.hp>0);
  const hurtAlly=aiUnits.filter(u=>u.hp/u.max<.72).sort((a,b)=>a.hp/a.max-b.hp/b.max)[0];
  const cluster=playerUnits.slice().sort((a,b)=>Math.hypot(a.x-210,a.y-350)-Math.hypot(b.x-210,b.y-350)).slice(0,4);
- const center=cluster.length?{x:cluster.reduce((s,u)=>s+u.x,0)/cluster.length,y:cluster.reduce((s,u)=>s+u.y,0)/cluster.length}:{x:210,y:580};
+ const center=cluster.length?{x:cluster.reduce((s,u)=>s+u.x,0)/cluster.length,y:cluster.reduce((s,u)=>s+u.y,0)/cluster.length}:{x:198,y:580};
  const threatened=playerUnits.filter(u=>u.y<360);
  const scores=choices.map(k=>{
   let score=Math.random()*.35;
@@ -483,7 +498,7 @@ function aiPlay(){
   else if(k==='heal'&&hurtAlly)cast(k,hurtAlly.x,hurtAlly.y,'e');
  }else{
   let lane=1;
-  if(playerUnits.length){const avg=playerUnits.reduce((s,u)=>s+u.x,0)/playerUnits.length;lane=avg<135?0:avg>285?2:1;}
+  if(playerUnits.length){const avg=playerUnits.reduce((s,u)=>s+u.x,0)/playerUnits.length;lane=avg<132?0:avg>264?2:1;}
   else{const weak=livingTowers('p').slice().sort((a,b)=>a.hp-b.hp)[0];if(weak)lane=weak.lane;}
   spawn(k,'e',laneXs[lane],Math.random()*75+130);
  }
@@ -618,22 +633,23 @@ function draw(){
  g.clearRect(0,0,W,H);
  const theme=arenaThemes[themeIndex];
  const ground=g.createLinearGradient(0,0,0,H);ground.addColorStop(0,'#345d48');ground.addColorStop(.48,theme.grass);ground.addColorStop(1,'#28513b');g.fillStyle=ground;g.fillRect(0,0,W,H);
- g.strokeStyle='#ffffff35';g.lineWidth=1;for(let y=0;y<=H;y+=35){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}for(let x=0;x<=W;x+=35){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
  g.fillStyle=theme.water;g.fillRect(0,320,W,60);
  g.fillStyle='#ffffff';g.globalAlpha=.12;g.fillRect(0,320,W,3);g.globalAlpha=1;
  bridgeXs.forEach(x=>{
-  g.fillStyle=theme.bridge;g.fillRect(x-32,310,64,80);
-  g.fillStyle='#d6b887';for(let y=315;y<390;y+=13)g.fillRect(x-29,y,58,5);
-  g.strokeStyle='#5b4630';g.lineWidth=3;g.strokeRect(x-32,310,64,80);
+  g.fillStyle=theme.bridge;g.fillRect(x-28,314,56,72);
+  g.fillStyle='#d6b887';for(let y=318;y<382;y+=11)g.fillRect(x-25,y,50,4);
+  g.strokeStyle='#5b4630';g.lineWidth=3;g.strokeRect(x-28,314,56,72);
  });
- g.strokeStyle='#ffffff70';g.lineWidth=1;for(let y=0;y<=H;y+=35){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}for(let x=0;x<=W;x+=35){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
+ g.strokeStyle='#ffffff70';g.lineWidth=1;
+ for(let row=0;row<=GRID_ROWS;row++){const y=row*CELL;g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}
+ for(let col=0;col<=GRID_COLS;col++){const x=col*CELL;g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
  g.fillStyle='#fff';g.font='bold 13px Arial';g.textAlign='center';g.textBaseline='alphabetic';
- g.fillText('YAPAY ZEKÂ',210,20);
- g.fillText(pName.toUpperCase(),210,692);
+ g.fillText('YAPAY ZEKÂ',198,20);
+ g.fillText(pName.toUpperCase(),198,696);
  towers.slice().sort((a,b)=>a.y-b.y).forEach(drawTower);
  drawDeployments();
  units.slice().sort((a,b)=>a.y-b.y).forEach(drawUnit);
- projectiles.forEach(p=>{g.fillStyle=p.kind==='atici'?'#78716c':p.kind==='babyDragon'?'#fb923c':p.team==='p'?'#e0f2fe':'#fee2e2';g.beginPath();g.arc(p.x,p.y,p.kind==='atici'?10:p.kind==='babyDragon'?6:4,0,Math.PI*2);g.fill();if(p.kind==='atici'){g.strokeStyle='#292524';g.lineWidth=2;g.stroke();}});
+ projectiles.forEach(p=>{if(p.kind==='bowler'){g.fillStyle='#78716c';g.beginPath();g.arc(p.x,p.y,11,0,Math.PI*2);g.fill();g.strokeStyle='#292524';g.lineWidth=2;g.stroke();}else{g.fillStyle=p.kind==='babyDragon'?'#fb923c':p.team==='p'?'#e0f2fe':'#fee2e2';g.beginPath();g.arc(p.x,p.y,p.kind==='babyDragon'?6:4,0,Math.PI*2);g.fill();}});
  poisonZones.forEach(z=>{g.fillStyle='#84cc16';g.globalAlpha=.2;g.beginPath();g.arc(z.x,z.y,82,0,Math.PI*2);g.fill();g.globalAlpha=1;});
  arrows.forEach(a=>{
   const dx=a.target.x-a.x,dy=a.target.y-a.y,d=Math.max(1,Math.hypot(dx,dy));
